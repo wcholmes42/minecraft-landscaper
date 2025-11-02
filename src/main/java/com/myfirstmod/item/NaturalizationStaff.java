@@ -3,6 +3,7 @@ package com.myfirstmod.item;
 import com.mojang.logging.LogUtils;
 import com.myfirstmod.config.NaturalizationConfig;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Inventory;
@@ -10,6 +11,7 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
@@ -17,6 +19,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.slf4j.Logger;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
@@ -35,6 +38,36 @@ public class NaturalizationStaff extends Item {
 
     public NaturalizationStaff(Properties properties) {
         super(properties);
+    }
+
+    // NBT key for storing mode
+    private static final String NBT_MODE = "NaturalizationMode";
+
+    // Get the current mode from item NBT
+    public static NaturalizationMode getMode(ItemStack stack) {
+        CompoundTag tag = stack.getTag();
+        if (tag != null && tag.contains(NBT_MODE)) {
+            int ordinal = tag.getInt(NBT_MODE);
+            NaturalizationMode[] modes = NaturalizationMode.values();
+            if (ordinal >= 0 && ordinal < modes.length) {
+                return modes[ordinal];
+            }
+        }
+        return NaturalizationMode.MESSY; // Default mode
+    }
+
+    // Set the mode on item NBT
+    public static void setMode(ItemStack stack, NaturalizationMode mode) {
+        CompoundTag tag = stack.getOrCreateTag();
+        tag.putInt(NBT_MODE, mode.ordinal());
+    }
+
+    @Override
+    public void appendHoverText(ItemStack stack, Level level, List<Component> tooltip, TooltipFlag flag) {
+        super.appendHoverText(stack, level, tooltip, flag);
+        NaturalizationMode mode = getMode(stack);
+        tooltip.add(Component.literal("§7Mode: §e" + mode.getDisplayName()));
+        tooltip.add(Component.literal("§7Press §bV §7to cycle modes"));
     }
 
     @Override
@@ -59,13 +92,17 @@ public class NaturalizationStaff extends Item {
         }
 
         BlockPos clickedPos = context.getClickedPos();
-        LOGGER.info("Naturalization Staff used at position: {}", clickedPos);
+
+        // Get current mode from staff
+        NaturalizationMode mode = getMode(context.getItemInHand());
+
+        LOGGER.info("Naturalization Staff used at position: {} in mode: {}", clickedPos, mode.getDisplayName());
 
         // Track resources needed if consume mode is enabled
         Map<Item, Integer> resourcesNeeded = new HashMap<>();
 
-        // Perform the naturalization
-        boolean success = naturalizeTerrain(level, clickedPos, player, resourcesNeeded);
+        // Perform the naturalization with current mode
+        boolean success = naturalizeTerrain(level, clickedPos, player, mode, resourcesNeeded);
 
         // Handle resource consumption
         if (NaturalizationConfig.shouldConsumeResources() && player != null && !player.isCreative()) {
@@ -84,7 +121,7 @@ public class NaturalizationStaff extends Item {
         return success ? InteractionResult.SUCCESS : InteractionResult.FAIL;
     }
 
-    private boolean naturalizeTerrain(Level level, BlockPos center, Player player, Map<Item, Integer> resourcesNeeded) {
+    private boolean naturalizeTerrain(Level level, BlockPos center, Player player, NaturalizationMode mode, Map<Item, Integer> resourcesNeeded) {
         int blocksChanged = 0;
         int landColumns = 0;
         int underwaterColumns = 0;
@@ -92,7 +129,7 @@ public class NaturalizationStaff extends Item {
         // Get radius from config
         int radius = NaturalizationConfig.getRadius();
 
-        LOGGER.info("Starting hybrid naturalization at {} with radius {}", center, radius);
+        LOGGER.info("Starting {} naturalization at {} with radius {}", mode.getDisplayName(), center, radius);
 
         // Iterate through the area
         for (int x = -radius; x <= radius; x++) {
@@ -114,7 +151,7 @@ public class NaturalizationStaff extends Item {
                     }
 
                     // Naturalize this column (each column checked independently!)
-                    blocksChanged += naturalizeColumn(level, columnPos, resourcesNeeded);
+                    blocksChanged += naturalizeColumn(level, columnPos, mode, resourcesNeeded);
                 }
             }
         }
@@ -142,7 +179,7 @@ public class NaturalizationStaff extends Item {
         return blocksChanged > 0;
     }
 
-    private int naturalizeColumn(Level level, BlockPos pos, Map<Item, Integer> resourcesNeeded) {
+    private int naturalizeColumn(Level level, BlockPos pos, NaturalizationMode mode, Map<Item, Integer> resourcesNeeded) {
         int changed = 0;
 
         // Find the surface level (topmost solid block)
@@ -171,8 +208,8 @@ public class NaturalizationStaff extends Item {
                 continue;
             }
 
-            // Determine what block should be here
-            BlockState newState = determineNaturalBlock(i, isUnderwater);
+            // Determine what block should be here based on mode
+            BlockState newState = determineNaturalBlock(i, isUnderwater, mode);
 
             // Only change if different (idempotent)
             if (!currentState.is(newState.getBlock())) {
@@ -185,6 +222,11 @@ public class NaturalizationStaff extends Item {
                     if (resourceItem != null) {
                         resourcesNeeded.merge(resourceItem, 1, Integer::sum);
                     }
+                }
+
+                // Add plants/decorations if mode requires it and this is the surface
+                if (i == 0 && mode.shouldAddPlants() && !isUnderwater) {
+                    addSurfaceDecoration(level, targetPos, newState);
                 }
             }
         }
@@ -290,58 +332,117 @@ public class NaturalizationStaff extends Item {
         return start;
     }
 
-    private BlockState determineNaturalBlock(int relativeY, boolean isUnderwater) {
+    private BlockState determineNaturalBlock(int relativeY, boolean isUnderwater, NaturalizationMode mode) {
         if (isUnderwater) {
-            // Underwater terrain layers (ocean floor)
+            // Underwater terrain layers (ocean floor) - unchanged
             if (relativeY > 0) {
                 return Blocks.AIR.defaultBlockState();
             } else if (relativeY == 0) {
-                // Ocean floor surface - sand or gravel
                 return Blocks.SAND.defaultBlockState();
             } else if (relativeY == -1) {
-                // Layer below surface - mix it up with gravel
                 return Blocks.GRAVEL.defaultBlockState();
             } else if (relativeY >= -3) {
-                // Mid subsurface - sand
                 return Blocks.SAND.defaultBlockState();
             } else if (relativeY >= -6) {
-                // Deeper - clay layer
                 return Blocks.CLAY.defaultBlockState();
             } else {
-                // Deep ocean floor - stone
                 return Blocks.STONE.defaultBlockState();
             }
         } else {
-            // Land terrain layers with natural variation
+            // Land terrain layers - varies by mode
             if (relativeY > 0) {
                 return Blocks.AIR.defaultBlockState();
             } else if (relativeY == 0) {
-                // Surface layer - grass with rare variants!
-                double roll = RANDOM.nextDouble();
-
-                // Super rare: Farmland (2% chance)
-                if (roll < FARMLAND_CHANCE) {
-                    return Blocks.FARMLAND.defaultBlockState();
-                }
-                // Rare: Dirt Path (5% chance)
-                else if (roll < FARMLAND_CHANCE + PATH_CHANCE) {
-                    return Blocks.DIRT_PATH.defaultBlockState();
-                }
-                // Uncommon: Gravel patches (8% chance)
-                else if (roll < FARMLAND_CHANCE + PATH_CHANCE + GRAVEL_CHANCE) {
-                    return Blocks.GRAVEL.defaultBlockState();
-                }
-                // Common: Grass (85% of the time)
-                else {
-                    return Blocks.GRASS_BLOCK.defaultBlockState();
-                }
+                // Surface layer - determined by mode
+                return getSurfaceBlock(mode);
             } else if (relativeY == -1) {
-                // Reduced dirt layer - only 1 layer now (was 3)
+                // Subsurface dirt layer (only 1 layer)
                 return Blocks.DIRT.defaultBlockState();
             } else {
-                // Deep subsurface - stone (starts at -2 now instead of -4)
+                // Deep subsurface - stone (starts at -2)
                 return Blocks.STONE.defaultBlockState();
             }
+        }
+    }
+
+    private BlockState getSurfaceBlock(NaturalizationMode mode) {
+        double roll = RANDOM.nextDouble();
+
+        switch (mode) {
+            case GRASS_ONLY:
+            case GRASS_WITH_PLANTS:
+                // MODE: Pure grass blocks only
+                // Plants added separately if GRASS_WITH_PLANTS
+                return Blocks.GRASS_BLOCK.defaultBlockState();
+
+            case PATH:
+                // MODE: Pure dirt paths only - great for trails
+                return Blocks.DIRT_PATH.defaultBlockState();
+
+            case MESSY_PATH:
+                // MODE: Mostly paths (75%) with natural variation
+                // 75% Dirt Path, 10% Gravel, 10% Grass, 5% Farmland
+                if (roll < 0.75) {
+                    return Blocks.DIRT_PATH.defaultBlockState();
+                } else if (roll < 0.85) {
+                    return Blocks.GRAVEL.defaultBlockState();
+                } else if (roll < 0.95) {
+                    return Blocks.GRASS_BLOCK.defaultBlockState();
+                } else {
+                    return Blocks.FARMLAND.defaultBlockState();
+                }
+
+            case MESSY:
+            case MESSY_WITH_PLANTS:
+            default:
+                // MODE: Natural variation - realistic terrain
+                // 85% Grass, 8% Gravel, 5% Path, 2% Farmland
+                // Plants added separately if MESSY_WITH_PLANTS
+                if (roll < 0.02) {
+                    // 2% Farmland (super rare)
+                    return Blocks.FARMLAND.defaultBlockState();
+                } else if (roll < 0.07) {
+                    // 5% Dirt Path (rare)
+                    return Blocks.DIRT_PATH.defaultBlockState();
+                } else if (roll < 0.15) {
+                    // 8% Gravel patches (uncommon)
+                    return Blocks.GRAVEL.defaultBlockState();
+                } else {
+                    // 85% Grass (common)
+                    return Blocks.GRASS_BLOCK.defaultBlockState();
+                }
+        }
+    }
+
+    private void addSurfaceDecoration(Level level, BlockPos surfacePos, BlockState surfaceBlock) {
+        // Add plants/grass on top of grass blocks
+        BlockPos abovePos = surfacePos.above();
+        BlockState aboveState = level.getBlockState(abovePos);
+
+        // Only place if air above
+        if (!aboveState.isAir()) {
+            return;
+        }
+
+        // Different decorations based on surface block
+        if (surfaceBlock.is(Blocks.GRASS_BLOCK)) {
+            // Random vegetation on grass
+            double roll = RANDOM.nextDouble();
+            if (roll < 0.3) {
+                // 30% grass plants (use GRASS for 1.20.1)
+                level.setBlock(abovePos, Blocks.GRASS.defaultBlockState(), 3);
+            } else if (roll < 0.35) {
+                // 5% flowers
+                if (RANDOM.nextBoolean()) {
+                    level.setBlock(abovePos, Blocks.DANDELION.defaultBlockState(), 3);
+                } else {
+                    level.setBlock(abovePos, Blocks.POPPY.defaultBlockState(), 3);
+                }
+            } else if (roll < 0.37) {
+                // 2% tall grass
+                level.setBlock(abovePos, Blocks.TALL_GRASS.defaultBlockState(), 3);
+            }
+            // Otherwise leave as air (63%)
         }
     }
 }
