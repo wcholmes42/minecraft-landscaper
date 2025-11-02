@@ -215,18 +215,6 @@ public class NaturalizationStaff extends Item {
             // Determine what block should be here based on mode
             BlockState newState = determineNaturalBlock(i, isUnderwater, mode);
 
-            // DEBUG: Log EVERY block determination at surface/subsurface
-            if (i >= -1) {
-                LOGGER.info("Block determination: i={}, surfacePos={}, targetPos={}, isUnderwater={}, mode={}, newState={}",
-                    i, surfacePos, targetPos, isUnderwater, mode.getDisplayName(), newState.getBlock());
-            }
-
-            // DEBUG: Log if we're placing stone ANYWHERE at i >= -1 (should never happen in Grass Only mode!)
-            if (i >= -1 && newState.is(Blocks.STONE)) {
-                LOGGER.error("🐛🐛🐛 BUG: determineNaturalBlock returned STONE at i={} for mode {}! This should be impossible!",
-                    i, mode.getDisplayName());
-            }
-
             // Only change if different (idempotent)
             if (!currentState.is(newState.getBlock())) {
                 level.setBlock(targetPos, newState, 3);
@@ -242,18 +230,15 @@ public class NaturalizationStaff extends Item {
             }
 
             // Add plants/decorations if mode requires it and this is the surface
-            // MOVED OUTSIDE the "if changed" block so it applies to ALL grass, not just new grass!
             if (i == 0 && mode.shouldAddPlants()) {
                 // Get the current surface block (might be newly placed or already existing)
                 BlockState surfaceState = level.getBlockState(targetPos);
 
                 // Apply to grass blocks (land) or sand blocks (beach) - 50% on beach
                 if (!isUnderwater && surfaceState.is(Blocks.GRASS_BLOCK)) {
-                    LOGGER.info("Attempting to add plants to grass at {} with mode {}", targetPos, mode.getDisplayName());
                     addSurfaceDecoration(level, targetPos, surfaceState);
                 } else if (!isUnderwater && surfaceState.is(Blocks.SAND) && RANDOM.nextDouble() < 0.5) {
                     // 50% chance to bonemeal beach sand
-                    LOGGER.info("Attempting to add beach plants to sand at {} with mode {}", targetPos, mode.getDisplayName());
                     addSurfaceDecoration(level, targetPos, surfaceState);
                 }
             }
@@ -377,16 +362,18 @@ public class NaturalizationStaff extends Item {
                 return Blocks.STONE.defaultBlockState();
             }
         } else {
-            // Land terrain layers - mode affects ALL layers, not just surface!
+            // Land terrain layers
             if (relativeY > 0) {
-                // Above detected surface - should be air
+                // Above surface - AIR only
                 return Blocks.AIR.defaultBlockState();
-            } else if (relativeY >= -1) {
-                // Surface and 1 layer below - use mode's surface block
-                // This allows "Grass Only" to convert dirt to grass, "Path Only" to convert to paths, etc.
+            } else if (relativeY == 0) {
+                // SURFACE LAYER - use mode
+                return getSurfaceBlock(mode);
+            } else if (relativeY == -1) {
+                // ONE LAYER BELOW SURFACE - use mode
                 return getSurfaceBlock(mode);
             } else {
-                // Deep subsurface (below -1) - stone
+                // DEEP subsurface (relativeY <= -2) - STONE only
                 return Blocks.STONE.defaultBlockState();
             }
         }
@@ -400,9 +387,7 @@ public class NaturalizationStaff extends Item {
             case GRASS_WITH_PLANTS:
                 // MODE: Pure grass blocks only
                 // Plants added separately if GRASS_WITH_PLANTS
-                BlockState grassResult = Blocks.GRASS_BLOCK.defaultBlockState();
-                LOGGER.info("getSurfaceBlock({}) returning GRASS (roll={})", mode.getDisplayName(), roll);
-                return grassResult;
+                return Blocks.GRASS_BLOCK.defaultBlockState();
 
             case PATH:
                 // MODE: Pure dirt paths only - great for trails
@@ -444,26 +429,16 @@ public class NaturalizationStaff extends Item {
     }
 
     private void addSurfaceDecoration(Level level, BlockPos surfacePos, BlockState surfaceBlock) {
-        // Apply actual bonemeal effect to grass blocks
-        LOGGER.info("addSurfaceDecoration called for block {} at {}", surfaceBlock.getBlock(), surfacePos);
-
+        // Apply actual Minecraft bonemeal effect
         if (level instanceof ServerLevel serverLevel) {
             Block block = surfaceBlock.getBlock();
-            LOGGER.info("Block is: {}, instanceof BonemealableBlock: {}", block, (block instanceof BonemealableBlock));
 
-            // Check if this block can be bonemealed (grass blocks implement BonemealableBlock)
+            // Check if this block can be bonemealed (grass/sand blocks implement BonemealableBlock)
             if (block instanceof BonemealableBlock bonemealable) {
-                boolean isValid = bonemealable.isValidBonemealTarget(serverLevel, surfacePos, surfaceBlock, false);
-                LOGGER.info("isValidBonemealTarget: {}", isValid);
-
-                if (isValid) {
-                    boolean success = bonemealable.isBonemealSuccess(serverLevel, serverLevel.random, surfacePos, surfaceBlock);
-                    LOGGER.info("isBonemealSuccess: {}", success);
-
-                    if (success) {
-                        // Apply the bonemeal effect - spawns grass, flowers, etc!
+                if (bonemealable.isValidBonemealTarget(serverLevel, surfacePos, surfaceBlock, false)) {
+                    if (bonemealable.isBonemealSuccess(serverLevel, serverLevel.random, surfacePos, surfaceBlock)) {
+                        // Apply the bonemeal effect - spawns grass, flowers, kelp, etc!
                         bonemealable.performBonemeal(serverLevel, serverLevel.random, surfacePos, surfaceBlock);
-                        LOGGER.info("*** BONEMEAL APPLIED at {} ***", surfacePos);
                     }
                 }
             }
