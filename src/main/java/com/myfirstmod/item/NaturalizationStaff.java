@@ -217,7 +217,8 @@ public class NaturalizationStaff extends Item {
 
             // Only change if different (idempotent)
             if (!currentState.is(newState.getBlock())) {
-                level.setBlock(targetPos, newState, 3);
+                // Flag 2 = send to clients but no block update (prevents drops)
+                level.setBlock(targetPos, newState, 2);
                 changed++;
 
                 // Track resources needed for this block
