@@ -1,5 +1,6 @@
 package com.myfirstmod;
 
+import com.myfirstmod.config.ConfigScreen;
 import com.myfirstmod.item.NaturalizationMode;
 import com.myfirstmod.item.NaturalizationStaff;
 import com.myfirstmod.network.CycleModePacket;
@@ -23,6 +24,7 @@ public class ClientEventHandler {
             Minecraft mc = Minecraft.getInstance();
             Player player = mc.player;
 
+            // Handle mode cycling
             if (player != null && KeyBindings.cycleMode.consumeClick()) {
                 ItemStack heldItem = player.getMainHandItem();
 
@@ -46,6 +48,11 @@ public class ClientEventHandler {
                     );
                 }
             }
+
+            // Handle opening settings screen
+            if (player != null && KeyBindings.openSettings.consumeClick()) {
+                mc.setScreen(new ConfigScreen(mc.screen));
+            }
         }
     }
 
@@ -55,6 +62,7 @@ public class ClientEventHandler {
         public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {
             KeyBindings.register();
             event.register(KeyBindings.cycleMode);
+            event.register(KeyBindings.openSettings);
         }
     }
 }

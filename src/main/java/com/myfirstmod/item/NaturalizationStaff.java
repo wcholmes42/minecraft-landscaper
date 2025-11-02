@@ -116,27 +116,81 @@ public class NaturalizationStaff extends Item {
         LOGGER.info("🎯 RIGHT-CLICKED at {}: block={}, blockAbove={}, mode={}",
             clickedPos, clickedBlock.getBlock(), blockAbove.getBlock(), mode.getDisplayName());
 
-        // Track resources needed if consume mode is enabled
-        Map<Item, Integer> resourcesNeeded = new HashMap<>();
-
-        // Perform the naturalization with current mode
-        boolean success = naturalizeTerrain(level, clickedPos, player, mode, resourcesNeeded);
-
-        // Handle resource consumption
+        // If resource consumption is enabled, pre-calculate what's needed BEFORE placing blocks
         if (NaturalizationConfig.shouldConsumeResources() && player != null && !player.isCreative()) {
-            if (!hasResources(player, resourcesNeeded)) {
+            Map<Item, Integer> resourcesNeeded = new HashMap<>();
+
+            // Dry run to calculate resources (don't place blocks)
+            calculateResourcesNeeded(level, clickedPos, mode, resourcesNeeded);
+
+            // Check if player has the resources
+            Map<Item, Integer> missingResources = getMissingResources(player, resourcesNeeded);
+            if (!missingResources.isEmpty()) {
                 player.displayClientMessage(
-                    Component.literal("Not enough resources! Need: " + formatResources(resourcesNeeded)),
+                    Component.literal("Not enough resources! Need: " + formatResources(missingResources)),
                     false
                 );
                 return InteractionResult.FAIL;
             }
 
-            // Consume the resources
-            consumeResources(player, resourcesNeeded);
-        }
+            // Player has resources - place blocks
+            // Pass empty map to prevent double-tracking
+            boolean success = naturalizeTerrain(level, clickedPos, player, mode, new HashMap<>());
 
-        return success ? InteractionResult.SUCCESS : InteractionResult.FAIL;
+            // Consume only what we originally calculated (not double-counted)
+            if (success) {
+                consumeResources(player, resourcesNeeded);
+            }
+
+            return success ? InteractionResult.SUCCESS : InteractionResult.FAIL;
+        } else {
+            // No resource consumption - just place blocks
+            Map<Item, Integer> resourcesNeeded = new HashMap<>();
+            boolean success = naturalizeTerrain(level, clickedPos, player, mode, resourcesNeeded);
+            return success ? InteractionResult.SUCCESS : InteractionResult.FAIL;
+        }
+    }
+
+    private void calculateResourcesNeeded(Level level, BlockPos center, NaturalizationMode mode, Map<Item, Integer> resourcesNeeded) {
+        // Dry run to calculate what resources would be needed without placing blocks
+        int radius = NaturalizationConfig.getRadius();
+
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                BlockPos columnPos = center.offset(dx, 0, dz);
+                BlockPos surfacePos = findSurface(level, columnPos);
+
+                if (surfacePos == null) continue;
+
+                boolean isUnderwater = isUnderwater(level, surfacePos);
+
+                // Simulate what blocks would be placed
+                for (int i = 0; i >= -HEIGHT_BELOW; i--) {
+                    BlockPos targetPos = surfacePos.offset(0, i, 0);
+                    BlockState currentState = level.getBlockState(targetPos);
+
+                    if (currentState.isAir() || currentState.liquid()) continue;
+                    if (!NaturalizationConfig.getSafeBlocks().contains(currentState.getBlock())) continue;
+
+                    BlockState newState = determineNaturalBlock(i, isUnderwater, mode);
+
+                    // Check if placing grass but something above - would place dirt instead
+                    if (i == 0 && newState.is(Blocks.GRASS_BLOCK)) {
+                        BlockState blockAbove = level.getBlockState(targetPos.above());
+                        if (!blockAbove.isAir() && !blockAbove.liquid()) {
+                            newState = Blocks.DIRT.defaultBlockState();
+                        }
+                    }
+
+                    if (!currentState.is(newState.getBlock())) {
+                        Item resourceItem = getResourceItemForBlock(newState);
+                        if (resourceItem != null) {
+                            resourcesNeeded.merge(resourceItem, 1, Integer::sum);
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private boolean naturalizeTerrain(Level level, BlockPos center, Player player, NaturalizationMode mode, Map<Item, Integer> resourcesNeeded) {
@@ -390,6 +444,22 @@ public class NaturalizationStaff extends Item {
         return null; // Unknown block
     }
 
+    private Map<Item, Integer> getMissingResources(Player player, Map<Item, Integer> needed) {
+        Map<Item, Integer> missing = new HashMap<>();
+        Inventory inventory = player.getInventory();
+
+        for (Map.Entry<Item, Integer> entry : needed.entrySet()) {
+            int have = countItem(inventory, entry.getKey());
+            int need = entry.getValue();
+
+            if (have < need) {
+                missing.put(entry.getKey(), need - have);
+            }
+        }
+
+        return missing;
+    }
+
     private boolean hasResources(Player player, Map<Item, Integer> needed) {
         Inventory inventory = player.getInventory();
         for (Map.Entry<Item, Integer> entry : needed.entrySet()) {
@@ -406,6 +476,8 @@ public class NaturalizationStaff extends Item {
         for (Map.Entry<Item, Integer> entry : needed.entrySet()) {
             removeItems(inventory, entry.getKey(), entry.getValue());
         }
+        // Mark inventory as changed to sync to client
+        inventory.setChanged();
     }
 
     private int countItem(Inventory inventory, Item item) {
