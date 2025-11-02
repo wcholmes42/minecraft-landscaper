@@ -3,6 +3,7 @@ package com.myfirstmod;
 import com.mojang.logging.LogUtils;
 import com.myfirstmod.config.NaturalizationConfig;
 import com.myfirstmod.item.NaturalizationStaff;
+import com.myfirstmod.network.ModPackets;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
@@ -73,6 +74,9 @@ public class MyFirstMod
     private void commonSetup(final FMLCommonSetupEvent event)
     {
         LOGGER.info("Terrain Naturalization Tools is loading!");
+
+        // Register network packets
+        event.enqueueWork(ModPackets::register);
 
         // Load configuration file
         NaturalizationConfig.load();

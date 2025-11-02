@@ -2,6 +2,8 @@ package com.myfirstmod;
 
 import com.myfirstmod.item.NaturalizationMode;
 import com.myfirstmod.item.NaturalizationStaff;
+import com.myfirstmod.network.CycleModePacket;
+import com.myfirstmod.network.ModPackets;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
@@ -27,7 +29,12 @@ public class ClientEventHandler {
                 if (heldItem.getItem() instanceof NaturalizationStaff) {
                     NaturalizationMode currentMode = NaturalizationStaff.getMode(heldItem);
                     NaturalizationMode nextMode = currentMode.next();
+
+                    // Update client-side immediately for tooltip
                     NaturalizationStaff.setMode(heldItem, nextMode);
+
+                    // Send packet to server to sync the change
+                    ModPackets.CHANNEL.sendToServer(new CycleModePacket(nextMode.ordinal()));
 
                     // Show mode change message
                     player.displayClientMessage(
