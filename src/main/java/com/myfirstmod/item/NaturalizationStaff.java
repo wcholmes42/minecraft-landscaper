@@ -96,11 +96,14 @@ public class NaturalizationStaff extends Item {
         }
 
         BlockPos clickedPos = context.getClickedPos();
+        BlockState clickedBlock = level.getBlockState(clickedPos);
+        BlockState blockAbove = level.getBlockState(clickedPos.above());
 
         // Get current mode from staff
         NaturalizationMode mode = getMode(context.getItemInHand());
 
-        LOGGER.info("Naturalization Staff used at position: {} in mode: {}", clickedPos, mode.getDisplayName());
+        LOGGER.info("🎯 RIGHT-CLICKED at {}: block={}, blockAbove={}, mode={}",
+            clickedPos, clickedBlock.getBlock(), blockAbove.getBlock(), mode.getDisplayName());
 
         // Track resources needed if consume mode is enabled
         Map<Item, Integer> resourcesNeeded = new HashMap<>();
