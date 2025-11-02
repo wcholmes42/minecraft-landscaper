@@ -69,6 +69,8 @@ public class NaturalizationConfig {
             "minecraft:podzol",
             "minecraft:mycelium",
             "minecraft:grass_block",
+            "minecraft:dirt_path",
+            "minecraft:farmland",
 
             // Sand and gravel
             "minecraft:sand",
