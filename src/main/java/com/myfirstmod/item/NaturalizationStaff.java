@@ -215,15 +215,16 @@ public class NaturalizationStaff extends Item {
             // Determine what block should be here based on mode
             BlockState newState = determineNaturalBlock(i, isUnderwater, mode);
 
-            // DEBUG: Log if we're placing stone ANYWHERE at i >= -1 (should never happen!)
-            if (i >= -1 && newState.is(Blocks.STONE)) {
-                LOGGER.error("🐛 BUG: Placing STONE at i={} (should be grass/path)! surfacePos: {}, targetPos: {}, underwater: {}, mode: {}",
-                    i, surfacePos, targetPos, isUnderwater, mode.getDisplayName());
+            // DEBUG: Log EVERY block determination at surface/subsurface
+            if (i >= -1) {
+                LOGGER.info("Block determination: i={}, surfacePos={}, targetPos={}, isUnderwater={}, mode={}, newState={}",
+                    i, surfacePos, targetPos, isUnderwater, mode.getDisplayName(), newState.getBlock());
             }
 
-            // DEBUG: Log every block placement at surface level
-            if (i == 0 && !currentState.is(newState.getBlock())) {
-                LOGGER.info("Surface block at {}: {} → {}", targetPos, currentState.getBlock(), newState.getBlock());
+            // DEBUG: Log if we're placing stone ANYWHERE at i >= -1 (should never happen in Grass Only mode!)
+            if (i >= -1 && newState.is(Blocks.STONE)) {
+                LOGGER.error("🐛🐛🐛 BUG: determineNaturalBlock returned STONE at i={} for mode {}! This should be impossible!",
+                    i, mode.getDisplayName());
             }
 
             // Only change if different (idempotent)
@@ -399,7 +400,9 @@ public class NaturalizationStaff extends Item {
             case GRASS_WITH_PLANTS:
                 // MODE: Pure grass blocks only
                 // Plants added separately if GRASS_WITH_PLANTS
-                return Blocks.GRASS_BLOCK.defaultBlockState();
+                BlockState grassResult = Blocks.GRASS_BLOCK.defaultBlockState();
+                LOGGER.info("getSurfaceBlock({}) returning GRASS (roll={})", mode.getDisplayName(), roll);
+                return grassResult;
 
             case PATH:
                 // MODE: Pure dirt paths only - great for trails
