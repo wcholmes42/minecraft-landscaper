@@ -349,17 +349,16 @@ public class NaturalizationStaff extends Item {
                 return Blocks.STONE.defaultBlockState();
             }
         } else {
-            // Land terrain layers - varies by mode
+            // Land terrain layers - mode affects ALL layers, not just surface!
             if (relativeY > 0) {
+                // Above detected surface - should be air
                 return Blocks.AIR.defaultBlockState();
-            } else if (relativeY == 0) {
-                // Surface layer - determined by mode
+            } else if (relativeY >= -1) {
+                // Surface and 1 layer below - use mode's surface block
+                // This allows "Grass Only" to convert dirt to grass, "Path Only" to convert to paths, etc.
                 return getSurfaceBlock(mode);
-            } else if (relativeY == -1) {
-                // Subsurface dirt layer (only 1 layer)
-                return Blocks.DIRT.defaultBlockState();
             } else {
-                // Deep subsurface - stone (starts at -2)
+                // Deep subsurface (below -1) - stone
                 return Blocks.STONE.defaultBlockState();
             }
         }
