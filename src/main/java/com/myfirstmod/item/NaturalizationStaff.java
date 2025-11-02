@@ -366,14 +366,12 @@ public class NaturalizationStaff extends Item {
             if (relativeY > 0) {
                 // Above surface - AIR only
                 return Blocks.AIR.defaultBlockState();
-            } else if (relativeY == 0) {
-                // SURFACE LAYER - use mode
-                return getSurfaceBlock(mode);
-            } else if (relativeY == -1) {
-                // ONE LAYER BELOW SURFACE - use mode
+            } else if (relativeY >= -3) {
+                // SURFACE through 3 layers below - use mode (grass/path/messy)
+                // Expanded from -1 to -3 to prevent stone showing through on uneven terrain
                 return getSurfaceBlock(mode);
             } else {
-                // DEEP subsurface (relativeY <= -2) - STONE only
+                // DEEP subsurface (relativeY <= -4) - STONE only
                 return Blocks.STONE.defaultBlockState();
             }
         }
