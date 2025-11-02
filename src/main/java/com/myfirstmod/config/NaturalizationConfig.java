@@ -63,6 +63,7 @@ public class NaturalizationConfig {
             "minecraft:gravel",
             "minecraft:sandstone",
             "minecraft:red_sandstone",
+            "minecraft:clay",
 
             // Nether terrain
             "minecraft:netherrack",

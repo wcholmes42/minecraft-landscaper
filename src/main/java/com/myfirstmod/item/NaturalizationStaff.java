@@ -42,6 +42,10 @@ public class NaturalizationStaff extends Item {
 
     private void naturalizeTerrain(Level level, BlockPos center) {
         int blocksChanged = 0;
+        int landColumns = 0;
+        int underwaterColumns = 0;
+
+        LOGGER.info("Starting hybrid naturalization at {}", center);
 
         // Iterate through the area
         for (int x = -RADIUS; x <= RADIUS; x++) {
@@ -51,13 +55,34 @@ public class NaturalizationStaff extends Item {
                     // Find the top solid block in this column
                     BlockPos columnPos = center.offset(x, 0, z);
 
-                    // Naturalize this column
+                    // Check if this specific column is underwater
+                    BlockPos surfacePos = findSurface(level, columnPos);
+                    if (surfacePos != null) {
+                        boolean isColumnUnderwater = isUnderwater(level, surfacePos);
+                        if (isColumnUnderwater) {
+                            underwaterColumns++;
+                        } else {
+                            landColumns++;
+                        }
+                    }
+
+                    // Naturalize this column (each column checked independently!)
                     blocksChanged += naturalizeColumn(level, columnPos);
                 }
             }
         }
 
-        LOGGER.info("Naturalization complete! Changed {} blocks", blocksChanged);
+        // Smart logging based on what was actually naturalized
+        String typeMessage;
+        if (underwaterColumns > 0 && landColumns > 0) {
+            typeMessage = String.format("Hybrid (land: %d columns, water: %d columns)", landColumns, underwaterColumns);
+        } else if (underwaterColumns > 0) {
+            typeMessage = "Underwater ocean floor";
+        } else {
+            typeMessage = "Land";
+        }
+
+        LOGGER.info("{} naturalization complete! Changed {} blocks", typeMessage, blocksChanged);
     }
 
     private int naturalizeColumn(Level level, BlockPos pos) {
@@ -70,12 +95,15 @@ public class NaturalizationStaff extends Item {
             return 0; // No solid blocks found
         }
 
+        // Check if this is an underwater environment
+        boolean isUnderwater = isUnderwater(level, surfacePos);
+
         // Now naturalize from surface downward
         for (int i = HEIGHT_ABOVE; i >= -HEIGHT_BELOW; i--) {
             BlockPos targetPos = surfacePos.offset(0, i, 0);
             BlockState currentState = level.getBlockState(targetPos);
 
-            // Skip air and liquids
+            // Skip air and liquids (we don't replace water)
             if (currentState.isAir() || currentState.liquid()) {
                 continue;
             }
@@ -87,7 +115,7 @@ public class NaturalizationStaff extends Item {
             }
 
             // Determine what block should be here
-            BlockState newState = determineNaturalBlock(i);
+            BlockState newState = determineNaturalBlock(i, isUnderwater);
 
             // Only change if different (idempotent)
             if (!currentState.is(newState.getBlock())) {
@@ -97,6 +125,12 @@ public class NaturalizationStaff extends Item {
         }
 
         return changed;
+    }
+
+    private boolean isUnderwater(Level level, BlockPos surface) {
+        // Check if the block above the surface is water
+        BlockState above = level.getBlockState(surface.above());
+        return above.is(Blocks.WATER);
     }
 
     private BlockPos findSurface(Level level, BlockPos start) {
@@ -130,24 +164,41 @@ public class NaturalizationStaff extends Item {
         return start;
     }
 
-    private BlockState determineNaturalBlock(int relativeY) {
-        // Layers from surface downward:
-        // 0: Grass block (surface)
-        // -1 to -3: Dirt
-        // -4 and below: Stone
-
-        if (relativeY > 0) {
-            // Above surface - leave as air (shouldn't reach here)
-            return Blocks.AIR.defaultBlockState();
-        } else if (relativeY == 0) {
-            // Surface layer - grass
-            return Blocks.GRASS_BLOCK.defaultBlockState();
-        } else if (relativeY >= -3) {
-            // Upper subsurface - dirt
-            return Blocks.DIRT.defaultBlockState();
+    private BlockState determineNaturalBlock(int relativeY, boolean isUnderwater) {
+        if (isUnderwater) {
+            // Underwater terrain layers (ocean floor)
+            if (relativeY > 0) {
+                return Blocks.AIR.defaultBlockState();
+            } else if (relativeY == 0) {
+                // Ocean floor surface - sand or gravel
+                return Blocks.SAND.defaultBlockState();
+            } else if (relativeY == -1) {
+                // Layer below surface - mix it up with gravel
+                return Blocks.GRAVEL.defaultBlockState();
+            } else if (relativeY >= -3) {
+                // Mid subsurface - sand
+                return Blocks.SAND.defaultBlockState();
+            } else if (relativeY >= -6) {
+                // Deeper - clay layer
+                return Blocks.CLAY.defaultBlockState();
+            } else {
+                // Deep ocean floor - stone
+                return Blocks.STONE.defaultBlockState();
+            }
         } else {
-            // Deep subsurface - stone
-            return Blocks.STONE.defaultBlockState();
+            // Land terrain layers (normal)
+            if (relativeY > 0) {
+                return Blocks.AIR.defaultBlockState();
+            } else if (relativeY == 0) {
+                // Surface layer - grass
+                return Blocks.GRASS_BLOCK.defaultBlockState();
+            } else if (relativeY >= -3) {
+                // Upper subsurface - dirt
+                return Blocks.DIRT.defaultBlockState();
+            } else {
+                // Deep subsurface - stone
+                return Blocks.STONE.defaultBlockState();
+            }
         }
     }
 }
