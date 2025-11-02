@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "landscaper:block/ruby_block"
+    }
+  }
+}
