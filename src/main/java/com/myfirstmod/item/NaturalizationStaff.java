@@ -249,19 +249,16 @@ public class NaturalizationStaff extends Item {
                     }
                 } else {
                     // No plants mode - DESTROY all vegetation above surface!
-                    LOGGER.info("DESTROY PLANTS branch entered!");
-                    BlockPos abovePos = targetPos.above();
-                    BlockState aboveState = level.getBlockState(abovePos);
-                    LOGGER.info("Block above at {}: {}, isAir={}, liquid={}",
-                        abovePos, aboveState.getBlock(), aboveState.isAir(), aboveState.liquid());
+                    // Clear up to 3 blocks above to catch tall grass, tall flowers, etc.
+                    for (int heightAbove = 1; heightAbove <= 3; heightAbove++) {
+                        BlockPos abovePos = targetPos.above(heightAbove);
+                        BlockState aboveState = level.getBlockState(abovePos);
 
-                    // Remove grass, flowers, tall grass, etc.
-                    if (!aboveState.isAir() && !aboveState.liquid()) {
-                        LOGGER.info("🔥 CLEARING vegetation at {}: {}", abovePos, aboveState.getBlock());
-                        // Flag 2 = no drops
-                        level.setBlock(abovePos, Blocks.AIR.defaultBlockState(), 2);
-                    } else {
-                        LOGGER.info("Skipping - block above is air or liquid");
+                        // Remove any non-solid blocks (grass, flowers, tall grass, etc.)
+                        if (!aboveState.isAir() && !aboveState.liquid() && !aboveState.isSolid()) {
+                            // Flag 2 = no drops
+                            level.setBlock(abovePos, Blocks.AIR.defaultBlockState(), 2);
+                        }
                     }
                 }
             }
