@@ -254,8 +254,8 @@ public class NaturalizationStaff extends Item {
                         BlockPos abovePos = targetPos.above(heightAbove);
                         BlockState aboveState = level.getBlockState(abovePos);
 
-                        // Remove any non-solid blocks (grass, flowers, tall grass, etc.)
-                        if (!aboveState.isAir() && !aboveState.liquid() && !aboveState.isSolid()) {
+                        // Remove EVERYTHING above that isn't air or liquid - aggressive clearing!
+                        if (!aboveState.isAir() && !aboveState.liquid()) {
                             // Flag 2 = no drops
                             level.setBlock(abovePos, Blocks.AIR.defaultBlockState(), 2);
                         }
