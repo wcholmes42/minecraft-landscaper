@@ -215,6 +215,12 @@ public class NaturalizationStaff extends Item {
             // Determine what block should be here based on mode
             BlockState newState = determineNaturalBlock(i, isUnderwater, mode);
 
+            // DEBUG: Log if we're placing stone at surface level
+            if (i == 0 && newState.is(Blocks.STONE)) {
+                LOGGER.warn("WARNING: Placing STONE at surface! Pos: {}, relativeY: {}, underwater: {}, mode: {}",
+                    targetPos, i, isUnderwater, mode.getDisplayName());
+            }
+
             // Only change if different (idempotent)
             if (!currentState.is(newState.getBlock())) {
                 level.setBlock(targetPos, newState, 3);
@@ -231,11 +237,17 @@ public class NaturalizationStaff extends Item {
 
             // Add plants/decorations if mode requires it and this is the surface
             // MOVED OUTSIDE the "if changed" block so it applies to ALL grass, not just new grass!
-            if (i == 0 && mode.shouldAddPlants() && !isUnderwater) {
+            if (i == 0 && mode.shouldAddPlants()) {
                 // Get the current surface block (might be newly placed or already existing)
                 BlockState surfaceState = level.getBlockState(targetPos);
-                if (surfaceState.is(Blocks.GRASS_BLOCK)) {
-                    LOGGER.info("Attempting to add plants at {} with mode {}", targetPos, mode.getDisplayName());
+
+                // Apply to grass blocks (land) or sand blocks (beach) - 50% on beach
+                if (!isUnderwater && surfaceState.is(Blocks.GRASS_BLOCK)) {
+                    LOGGER.info("Attempting to add plants to grass at {} with mode {}", targetPos, mode.getDisplayName());
+                    addSurfaceDecoration(level, targetPos, surfaceState);
+                } else if (!isUnderwater && surfaceState.is(Blocks.SAND) && RANDOM.nextDouble() < 0.5) {
+                    // 50% chance to bonemeal beach sand
+                    LOGGER.info("Attempting to add beach plants to sand at {} with mode {}", targetPos, mode.getDisplayName());
                     addSurfaceDecoration(level, targetPos, surfaceState);
                 }
             }
