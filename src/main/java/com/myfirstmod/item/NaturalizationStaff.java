@@ -199,7 +199,7 @@ public class NaturalizationStaff extends Item {
         // Check if this is an underwater environment
         boolean isUnderwater = isUnderwater(level, surfacePos);
 
-        // Now naturalize from surface downward
+        // PASS 1: Clear blocks to AIR (destroys vegetation above, terrain at/below surface)
         for (int i = HEIGHT_ABOVE; i >= -HEIGHT_BELOW; i--) {
             BlockPos targetPos = surfacePos.offset(0, i, 0);
             BlockState currentState = level.getBlockState(targetPos);
@@ -209,67 +209,67 @@ public class NaturalizationStaff extends Item {
                 continue;
             }
 
-            // SAFETY CHECK: Only replace blocks in the config's safe list!
-            if (!NaturalizationConfig.getSafeBlocks().contains(currentState.getBlock())) {
-                // This block is not safe to replace (might be a chest, ore, etc.)
-                continue;
+            if (i > 0) {
+                // ABOVE surface: Only clear vegetation (grass, flowers, saplings, mushrooms, etc.)
+                // Check if it's a plant-type block (extends BushBlock) or is replaceable
+                boolean isVegetation = currentState.canBeReplaced() ||
+                                      currentState.getBlock() instanceof net.minecraft.world.level.block.BushBlock ||
+                                      currentState.getBlock() instanceof net.minecraft.world.level.block.SaplingBlock;
+
+                if (isVegetation) {
+                    level.setBlock(targetPos, Blocks.AIR.defaultBlockState(), 2);
+                }
+            } else {
+                // AT or BELOW surface: Only clear safe terrain blocks
+                if (NaturalizationConfig.getSafeBlocks().contains(currentState.getBlock())) {
+                    level.setBlock(targetPos, Blocks.AIR.defaultBlockState(), 2);
+                }
             }
+        }
+
+        // PASS 2: Place terrain blocks from surface downward
+        for (int i = 0; i >= -HEIGHT_BELOW; i--) {
+            BlockPos targetPos = surfacePos.offset(0, i, 0);
 
             // Determine what block should be here based on mode
             BlockState newState = determineNaturalBlock(i, isUnderwater, mode);
 
-            // Only change if different (idempotent)
-            if (!currentState.is(newState.getBlock())) {
-                // Flag 2 = send to clients but no block update (prevents drops)
-                level.setBlock(targetPos, newState, 2);
-                changed++;
+            // Place the block (flag 2 = no drops)
+            level.setBlock(targetPos, newState, 2);
+            changed++;
 
-                // Track resources needed for this block
-                if (NaturalizationConfig.shouldConsumeResources()) {
-                    Item resourceItem = getResourceItemForBlock(newState);
-                    if (resourceItem != null) {
-                        resourcesNeeded.merge(resourceItem, 1, Integer::sum);
-                    }
+            // Track resources needed for this block
+            if (NaturalizationConfig.shouldConsumeResources()) {
+                Item resourceItem = getResourceItemForBlock(newState);
+                if (resourceItem != null) {
+                    resourcesNeeded.merge(resourceItem, 1, Integer::sum);
                 }
             }
 
             // Handle surface decorations based on mode
             if (i == 0) {
-                LOGGER.info("Surface block processing: i={}, targetPos={}, mode={}, shouldAddPlants={}",
-                    i, targetPos, mode.getDisplayName(), mode.shouldAddPlants());
-
-                // Get the current surface block
                 BlockState surfaceState = level.getBlockState(targetPos);
 
                 if (mode.shouldAddPlants()) {
                     // Add plants mode - apply bonemeal
-                    LOGGER.info("ADD PLANTS branch - surfaceState={}", surfaceState.getBlock());
                     if (!isUnderwater && surfaceState.is(Blocks.GRASS_BLOCK)) {
                         addSurfaceDecoration(level, targetPos, surfaceState);
                     } else if (!isUnderwater && surfaceState.is(Blocks.SAND) && RANDOM.nextDouble() < 0.5) {
                         // 50% chance to bonemeal beach sand
                         addSurfaceDecoration(level, targetPos, surfaceState);
                     }
-                } else {
-                    // No plants mode - DESTROY all vegetation above surface!
-                    LOGGER.info("🔥 GRASS ONLY MODE - DESTROYING VEGETATION!");
-                    // Clear up to 3 blocks above to catch tall grass, tall flowers, etc.
-                    for (int heightAbove = 1; heightAbove <= 3; heightAbove++) {
-                        BlockPos abovePos = targetPos.above(heightAbove);
-                        BlockState aboveState = level.getBlockState(abovePos);
-                        LOGGER.info("Checking {} blocks above at {}: block={}, isAir={}, liquid={}",
-                            heightAbove, abovePos, aboveState.getBlock(), aboveState.isAir(), aboveState.liquid());
-
-                        // Remove EVERYTHING above that isn't air or liquid - aggressive clearing!
-                        if (!aboveState.isAir() && !aboveState.liquid()) {
-                            LOGGER.info("💥 CLEARING BLOCK at {}: {}", abovePos, aboveState.getBlock());
-                            // Flag 2 = no drops
-                            level.setBlock(abovePos, Blocks.AIR.defaultBlockState(), 2);
-                        }
-                    }
-                    LOGGER.info("Vegetation clearing loop complete for {}", targetPos);
                 }
             }
+        }
+
+        // PASS 3: Clean up item drops in the area
+        if (!level.isClientSide()) {
+            int cleanupRadius = NaturalizationConfig.getRadius();
+            BlockPos center = surfacePos;
+            level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
+                new net.minecraft.world.phys.AABB(center).inflate(cleanupRadius),
+                entity -> true
+            ).forEach(itemEntity -> itemEntity.discard());
         }
 
         return changed;
@@ -346,12 +346,11 @@ public class NaturalizationStaff extends Item {
         // Search upward first to handle being underground
         for (int y = 0; y < HEIGHT_ABOVE + 10; y++) {
             BlockPos checkPos = start.offset(0, y, 0);
-            BlockState above = level.getBlockState(checkPos.above());
             BlockState current = level.getBlockState(checkPos);
 
-            // Found surface: solid block with air/liquid above
-            if (!current.isAir() && !current.liquid() &&
-                (above.isAir() || above.liquid())) {
+            // Found surface: block in safe list (replaceable terrain like dirt, grass, stone)
+            // This skips trees, vegetation, and other non-terrain blocks
+            if (NaturalizationConfig.getSafeBlocks().contains(current.getBlock())) {
                 return checkPos;
             }
         }
@@ -359,12 +358,10 @@ public class NaturalizationStaff extends Item {
         // If not found above, search downward
         for (int y = 0; y > -HEIGHT_BELOW - 10; y--) {
             BlockPos checkPos = start.offset(0, y, 0);
-            BlockState above = level.getBlockState(checkPos.above());
             BlockState current = level.getBlockState(checkPos);
 
-            // Found surface: solid block with air/liquid above
-            if (!current.isAir() && !current.liquid() &&
-                (above.isAir() || above.liquid())) {
+            // Found surface: block in safe list (replaceable terrain)
+            if (NaturalizationConfig.getSafeBlocks().contains(current.getBlock())) {
                 return checkPos;
             }
         }
@@ -394,10 +391,12 @@ public class NaturalizationStaff extends Item {
             if (relativeY > 0) {
                 // Above surface - AIR only
                 return Blocks.AIR.defaultBlockState();
-            } else if (relativeY >= -3) {
-                // SURFACE through 3 layers below - use mode (grass/path/messy)
-                // Expanded from -1 to -3 to prevent stone showing through on uneven terrain
+            } else if (relativeY == 0) {
+                // SURFACE ONLY - use mode (grass/path/messy)
                 return getSurfaceBlock(mode);
+            } else if (relativeY >= -3) {
+                // 1-3 blocks below surface - DIRT
+                return Blocks.DIRT.defaultBlockState();
             } else {
                 // DEEP subsurface (relativeY <= -4) - STONE only
                 return Blocks.STONE.defaultBlockState();
