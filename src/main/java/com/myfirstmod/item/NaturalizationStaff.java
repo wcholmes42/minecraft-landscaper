@@ -227,10 +227,16 @@ public class NaturalizationStaff extends Item {
                         resourcesNeeded.merge(resourceItem, 1, Integer::sum);
                     }
                 }
+            }
 
-                // Add plants/decorations if mode requires it and this is the surface
-                if (i == 0 && mode.shouldAddPlants() && !isUnderwater) {
-                    addSurfaceDecoration(level, targetPos, newState);
+            // Add plants/decorations if mode requires it and this is the surface
+            // MOVED OUTSIDE the "if changed" block so it applies to ALL grass, not just new grass!
+            if (i == 0 && mode.shouldAddPlants() && !isUnderwater) {
+                // Get the current surface block (might be newly placed or already existing)
+                BlockState surfaceState = level.getBlockState(targetPos);
+                if (surfaceState.is(Blocks.GRASS_BLOCK)) {
+                    LOGGER.info("Attempting to add plants at {} with mode {}", targetPos, mode.getDisplayName());
+                    addSurfaceDecoration(level, targetPos, surfaceState);
                 }
             }
         }
@@ -419,18 +425,25 @@ public class NaturalizationStaff extends Item {
 
     private void addSurfaceDecoration(Level level, BlockPos surfacePos, BlockState surfaceBlock) {
         // Apply actual bonemeal effect to grass blocks
+        LOGGER.info("addSurfaceDecoration called for block {} at {}", surfaceBlock.getBlock(), surfacePos);
+
         if (level instanceof ServerLevel serverLevel) {
             Block block = surfaceBlock.getBlock();
+            LOGGER.info("Block is: {}, instanceof BonemealableBlock: {}", block, (block instanceof BonemealableBlock));
 
             // Check if this block can be bonemealed (grass blocks implement BonemealableBlock)
             if (block instanceof BonemealableBlock bonemealable) {
-                // Check if bonemeal can be applied
-                if (bonemealable.isValidBonemealTarget(serverLevel, surfacePos, surfaceBlock, false)) {
-                    // Check success chance
-                    if (bonemealable.isBonemealSuccess(serverLevel, serverLevel.random, surfacePos, surfaceBlock)) {
+                boolean isValid = bonemealable.isValidBonemealTarget(serverLevel, surfacePos, surfaceBlock, false);
+                LOGGER.info("isValidBonemealTarget: {}", isValid);
+
+                if (isValid) {
+                    boolean success = bonemealable.isBonemealSuccess(serverLevel, serverLevel.random, surfacePos, surfaceBlock);
+                    LOGGER.info("isBonemealSuccess: {}", success);
+
+                    if (success) {
                         // Apply the bonemeal effect - spawns grass, flowers, etc!
                         bonemealable.performBonemeal(serverLevel, serverLevel.random, surfacePos, surfaceBlock);
-                        LOGGER.debug("Applied bonemeal effect at {}", surfacePos);
+                        LOGGER.info("*** BONEMEAL APPLIED at {} ***", surfacePos);
                     }
                 }
             }
