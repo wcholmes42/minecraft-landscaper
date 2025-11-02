@@ -232,11 +232,15 @@ public class NaturalizationStaff extends Item {
 
             // Handle surface decorations based on mode
             if (i == 0) {
+                LOGGER.info("Surface block processing: i={}, targetPos={}, mode={}, shouldAddPlants={}",
+                    i, targetPos, mode.getDisplayName(), mode.shouldAddPlants());
+
                 // Get the current surface block
                 BlockState surfaceState = level.getBlockState(targetPos);
 
                 if (mode.shouldAddPlants()) {
                     // Add plants mode - apply bonemeal
+                    LOGGER.info("ADD PLANTS branch - surfaceState={}", surfaceState.getBlock());
                     if (!isUnderwater && surfaceState.is(Blocks.GRASS_BLOCK)) {
                         addSurfaceDecoration(level, targetPos, surfaceState);
                     } else if (!isUnderwater && surfaceState.is(Blocks.SAND) && RANDOM.nextDouble() < 0.5) {
@@ -245,14 +249,19 @@ public class NaturalizationStaff extends Item {
                     }
                 } else {
                     // No plants mode - DESTROY all vegetation above surface!
+                    LOGGER.info("DESTROY PLANTS branch entered!");
                     BlockPos abovePos = targetPos.above();
                     BlockState aboveState = level.getBlockState(abovePos);
+                    LOGGER.info("Block above at {}: {}, isAir={}, liquid={}",
+                        abovePos, aboveState.getBlock(), aboveState.isAir(), aboveState.liquid());
 
                     // Remove grass, flowers, tall grass, etc.
                     if (!aboveState.isAir() && !aboveState.liquid()) {
-                        LOGGER.info("Clearing vegetation at {}: {}", abovePos, aboveState.getBlock());
+                        LOGGER.info("🔥 CLEARING vegetation at {}: {}", abovePos, aboveState.getBlock());
                         // Flag 2 = no drops
                         level.setBlock(abovePos, Blocks.AIR.defaultBlockState(), 2);
+                    } else {
+                        LOGGER.info("Skipping - block above is air or liquid");
                     }
                 }
             }
