@@ -5,16 +5,20 @@ import com.myfirstmod.config.NaturalizationConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.BoneMealItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.BonemealableBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import org.slf4j.Logger;
 
@@ -414,34 +418,22 @@ public class NaturalizationStaff extends Item {
     }
 
     private void addSurfaceDecoration(Level level, BlockPos surfacePos, BlockState surfaceBlock) {
-        // Add plants/grass on top of grass blocks
-        BlockPos abovePos = surfacePos.above();
-        BlockState aboveState = level.getBlockState(abovePos);
+        // Apply actual bonemeal effect to grass blocks
+        if (level instanceof ServerLevel serverLevel) {
+            Block block = surfaceBlock.getBlock();
 
-        // Only place if air above
-        if (!aboveState.isAir()) {
-            return;
-        }
-
-        // Different decorations based on surface block
-        if (surfaceBlock.is(Blocks.GRASS_BLOCK)) {
-            // Random vegetation on grass
-            double roll = RANDOM.nextDouble();
-            if (roll < 0.3) {
-                // 30% grass plants (use GRASS for 1.20.1)
-                level.setBlock(abovePos, Blocks.GRASS.defaultBlockState(), 3);
-            } else if (roll < 0.35) {
-                // 5% flowers
-                if (RANDOM.nextBoolean()) {
-                    level.setBlock(abovePos, Blocks.DANDELION.defaultBlockState(), 3);
-                } else {
-                    level.setBlock(abovePos, Blocks.POPPY.defaultBlockState(), 3);
+            // Check if this block can be bonemealed (grass blocks implement BonemealableBlock)
+            if (block instanceof BonemealableBlock bonemealable) {
+                // Check if bonemeal can be applied
+                if (bonemealable.isValidBonemealTarget(serverLevel, surfacePos, surfaceBlock, false)) {
+                    // Check success chance
+                    if (bonemealable.isBonemealSuccess(serverLevel, serverLevel.random, surfacePos, surfaceBlock)) {
+                        // Apply the bonemeal effect - spawns grass, flowers, etc!
+                        bonemealable.performBonemeal(serverLevel, serverLevel.random, surfacePos, surfaceBlock);
+                        LOGGER.debug("Applied bonemeal effect at {}", surfacePos);
+                    }
                 }
-            } else if (roll < 0.37) {
-                // 2% tall grass
-                level.setBlock(abovePos, Blocks.TALL_GRASS.defaultBlockState(), 3);
             }
-            // Otherwise leave as air (63%)
         }
     }
 }
