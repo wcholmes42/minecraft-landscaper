@@ -215,10 +215,15 @@ public class NaturalizationStaff extends Item {
             // Determine what block should be here based on mode
             BlockState newState = determineNaturalBlock(i, isUnderwater, mode);
 
-            // DEBUG: Log if we're placing stone at surface level
-            if (i == 0 && newState.is(Blocks.STONE)) {
-                LOGGER.warn("WARNING: Placing STONE at surface! Pos: {}, relativeY: {}, underwater: {}, mode: {}",
-                    targetPos, i, isUnderwater, mode.getDisplayName());
+            // DEBUG: Log if we're placing stone ANYWHERE at i >= -1 (should never happen!)
+            if (i >= -1 && newState.is(Blocks.STONE)) {
+                LOGGER.error("🐛 BUG: Placing STONE at i={} (should be grass/path)! surfacePos: {}, targetPos: {}, underwater: {}, mode: {}",
+                    i, surfacePos, targetPos, isUnderwater, mode.getDisplayName());
+            }
+
+            // DEBUG: Log every block placement at surface level
+            if (i == 0 && !currentState.is(newState.getBlock())) {
+                LOGGER.info("Surface block at {}: {} → {}", targetPos, currentState.getBlock(), newState.getBlock());
             }
 
             // Only change if different (idempotent)
