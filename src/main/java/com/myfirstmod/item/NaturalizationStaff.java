@@ -95,6 +95,17 @@ public class NaturalizationStaff extends Item {
             return InteractionResult.FAIL;
         }
 
+        // Only allow clicking on the TOP face of blocks
+        if (context.getClickedFace() != net.minecraft.core.Direction.UP) {
+            if (player != null) {
+                player.displayClientMessage(
+                    Component.literal("You must click on the top of a block!"),
+                    true // Action bar message
+                );
+            }
+            return InteractionResult.FAIL;
+        }
+
         BlockPos clickedPos = context.getClickedPos();
         BlockState clickedBlock = level.getBlockState(clickedPos);
         BlockState blockAbove = level.getBlockState(clickedPos.above());
@@ -234,6 +245,15 @@ public class NaturalizationStaff extends Item {
             // Determine what block should be here based on mode
             BlockState newState = determineNaturalBlock(i, isUnderwater, mode);
 
+            // Special check: If placing grass at surface, check if something is above
+            if (i == 0 && newState.is(Blocks.GRASS_BLOCK)) {
+                BlockState blockAbove = level.getBlockState(targetPos.above());
+                if (!blockAbove.isAir() && !blockAbove.liquid()) {
+                    // Something above grass - place dirt instead
+                    newState = Blocks.DIRT.defaultBlockState();
+                }
+            }
+
             // Place the block (flag 2 = no drops)
             level.setBlock(targetPos, newState, 2);
             changed++;
@@ -251,12 +271,28 @@ public class NaturalizationStaff extends Item {
                 BlockState surfaceState = level.getBlockState(targetPos);
 
                 if (mode.shouldAddPlants()) {
-                    // Add plants mode - apply bonemeal
+                    // Add plants mode - WFC-inspired aesthetic vegetation placement
                     if (!isUnderwater && surfaceState.is(Blocks.GRASS_BLOCK)) {
-                        addSurfaceDecoration(level, targetPos, surfaceState);
-                    } else if (!isUnderwater && surfaceState.is(Blocks.SAND) && RANDOM.nextDouble() < 0.5) {
-                        // 50% chance to bonemeal beach sand
-                        addSurfaceDecoration(level, targetPos, surfaceState);
+                        // 7.5% chance to attempt placing vegetation (tripled from 2.5%)
+                        if (RANDOM.nextDouble() < 0.075) {
+                            BlockPos abovePos = targetPos.above();
+                            // Only place if air above
+                            if (level.getBlockState(abovePos).isAir()) {
+                                BlockState plantState = getRandomVegetation();
+                                // WFC check: ensure aesthetic variety (no identical neighbors)
+                                if (shouldPlaceVegetation(level, abovePos, plantState)) {
+                                    level.setBlock(abovePos, plantState, 2);
+                                }
+                            }
+                        }
+                    } else if (!isUnderwater && surfaceState.is(Blocks.SAND)) {
+                        // 1.5% chance for beach vegetation (dead bush)
+                        if (RANDOM.nextDouble() < 0.015) {
+                            BlockPos abovePos = targetPos.above();
+                            if (level.getBlockState(abovePos).isAir()) {
+                                level.setBlock(abovePos, Blocks.DEAD_BUSH.defaultBlockState(), 2);
+                            }
+                        }
                     }
                 }
             }
@@ -273,6 +309,72 @@ public class NaturalizationStaff extends Item {
         }
 
         return changed;
+    }
+
+    private BlockState getRandomVegetation() {
+        // Weighted vegetation palette for natural aesthetics
+        // Distribution: 40% short grass, 25% tall grass, 12.5% 2-tall plants, 7.5% fern, 5% common flowers, 2.5% rare flowers
+        double roll = RANDOM.nextDouble();
+
+        // 40% short grass (most common)
+        if (roll < 0.40) {
+            return Blocks.GRASS.defaultBlockState();
+        }
+        // 25% tall grass
+        else if (roll < 0.65) {
+            return Blocks.TALL_GRASS.defaultBlockState();
+        }
+        // 12.5% 2-block tall plants (half of tall grass %)
+        else if (roll < 0.775) {
+            Block[] tallPlants = {Blocks.LARGE_FERN, Blocks.TALL_GRASS};
+            return tallPlants[RANDOM.nextInt(tallPlants.length)].defaultBlockState();
+        }
+        // 7.5% fern (halved from previous)
+        else if (roll < 0.85) {
+            return Blocks.FERN.defaultBlockState();
+        }
+        // 12.5% flowers total (down from 30%)
+        // 8.3% common flowers
+        else if (roll < 0.933) {
+            Block[] commonFlowers = {Blocks.DANDELION, Blocks.POPPY};
+            return commonFlowers[RANDOM.nextInt(commonFlowers.length)].defaultBlockState();
+        }
+        // 4.2% rare flowers
+        else {
+            Block[] rareFlowers = {
+                Blocks.BLUE_ORCHID,
+                Blocks.ALLIUM,
+                Blocks.AZURE_BLUET,
+                Blocks.OXEYE_DAISY,
+                Blocks.CORNFLOWER,
+                Blocks.LILY_OF_THE_VALLEY
+            };
+            return rareFlowers[RANDOM.nextInt(rareFlowers.length)].defaultBlockState();
+        }
+    }
+
+    private boolean shouldPlaceVegetation(Level level, BlockPos pos, BlockState plantToPlace) {
+        // Wave Function Collapse inspired aesthetics:
+        // Check neighbors to avoid placing identical plants adjacent
+        // This creates natural variation and avoids artificial-looking clusters
+
+        BlockPos[] neighbors = {
+            pos.north(), pos.south(), pos.east(), pos.west(),
+            pos.north().east(), pos.north().west(),
+            pos.south().east(), pos.south().west()
+        };
+
+        // Count identical plants in immediate vicinity
+        int sameTypeCount = 0;
+        for (BlockPos neighbor : neighbors) {
+            BlockState neighborState = level.getBlockState(neighbor);
+            if (neighborState.is(plantToPlace.getBlock())) {
+                sameTypeCount++;
+            }
+        }
+
+        // Reject if 2+ identical plants nearby (enforces variety)
+        return sameTypeCount < 2;
     }
 
     private Item getResourceItemForBlock(BlockState state) {
