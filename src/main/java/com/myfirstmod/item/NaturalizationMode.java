@@ -40,4 +40,10 @@ public enum NaturalizationMode {
         NaturalizationMode[] values = values();
         return values[(this.ordinal() + 1) % values.length];
     }
+
+    public NaturalizationMode previous() {
+        NaturalizationMode[] values = values();
+        int newOrdinal = (this.ordinal() - 1 + values.length) % values.length;
+        return values[newOrdinal];
+    }
 }

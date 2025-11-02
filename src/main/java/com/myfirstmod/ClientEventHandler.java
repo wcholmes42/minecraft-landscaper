@@ -28,7 +28,10 @@ public class ClientEventHandler {
 
                 if (heldItem.getItem() instanceof NaturalizationStaff) {
                     NaturalizationMode currentMode = NaturalizationStaff.getMode(heldItem);
-                    NaturalizationMode nextMode = currentMode.next();
+
+                    // Check if shift is held - cycle backward if yes, forward if no
+                    boolean shiftHeld = net.minecraft.client.gui.screens.Screen.hasShiftDown();
+                    NaturalizationMode nextMode = shiftHeld ? currentMode.previous() : currentMode.next();
 
                     // Update client-side immediately for tooltip
                     NaturalizationStaff.setMode(heldItem, nextMode);

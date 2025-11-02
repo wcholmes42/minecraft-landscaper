@@ -1,6 +1,7 @@
 package com.myfirstmod;
 
 import com.mojang.logging.LogUtils;
+import com.myfirstmod.config.ConfigScreen;
 import com.myfirstmod.config.NaturalizationConfig;
 import com.myfirstmod.item.NaturalizationStaff;
 import com.myfirstmod.network.ModPackets;
@@ -69,6 +70,14 @@ public class MyFirstMod
 
         // Add items to creative tabs
         modEventBus.addListener(this::addCreative);
+
+        // Register config screen
+        net.minecraftforge.fml.ModLoadingContext.get().registerExtensionPoint(
+            net.minecraftforge.client.ConfigScreenHandler.ConfigScreenFactory.class,
+            () -> new net.minecraftforge.client.ConfigScreenHandler.ConfigScreenFactory(
+                (mc, screen) -> new ConfigScreen(screen)
+            )
+        );
     }
 
     private void commonSetup(final FMLCommonSetupEvent event)

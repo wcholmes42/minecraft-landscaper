@@ -177,4 +177,32 @@ public class NaturalizationConfig {
         }
         return overworldOnly;
     }
+
+    public static void saveConfig(int newRadius, boolean newConsumeResources, boolean newOverworldOnly) {
+        radius = Math.max(1, Math.min(10, newRadius));
+        consumeResources = newConsumeResources;
+        overworldOnly = newOverworldOnly;
+
+        Path configPath = FMLPaths.CONFIGDIR.get().resolve(CONFIG_FILE_NAME);
+
+        try {
+            // Read current config to preserve safe blocks list
+            String json = Files.readString(configPath);
+            ConfigData config = GSON.fromJson(json, ConfigData.class);
+
+            // Update only the changed values
+            config.radius = radius;
+            config.consume_resources = consumeResources;
+            config.overworld_only = overworldOnly;
+
+            // Write back to file
+            String updatedJson = GSON.toJson(config);
+            Files.writeString(configPath, updatedJson);
+
+            LOGGER.info("Config saved: radius={}, consume_resources={}, overworld_only={}",
+                radius, consumeResources, overworldOnly);
+        } catch (IOException e) {
+            LOGGER.error("Failed to save config", e);
+        }
+    }
 }
