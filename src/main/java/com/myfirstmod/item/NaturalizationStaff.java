@@ -230,17 +230,29 @@ public class NaturalizationStaff extends Item {
                 }
             }
 
-            // Add plants/decorations if mode requires it and this is the surface
-            if (i == 0 && mode.shouldAddPlants()) {
-                // Get the current surface block (might be newly placed or already existing)
+            // Handle surface decorations based on mode
+            if (i == 0) {
+                // Get the current surface block
                 BlockState surfaceState = level.getBlockState(targetPos);
 
-                // Apply to grass blocks (land) or sand blocks (beach) - 50% on beach
-                if (!isUnderwater && surfaceState.is(Blocks.GRASS_BLOCK)) {
-                    addSurfaceDecoration(level, targetPos, surfaceState);
-                } else if (!isUnderwater && surfaceState.is(Blocks.SAND) && RANDOM.nextDouble() < 0.5) {
-                    // 50% chance to bonemeal beach sand
-                    addSurfaceDecoration(level, targetPos, surfaceState);
+                if (mode.shouldAddPlants()) {
+                    // Add plants mode - apply bonemeal
+                    if (!isUnderwater && surfaceState.is(Blocks.GRASS_BLOCK)) {
+                        addSurfaceDecoration(level, targetPos, surfaceState);
+                    } else if (!isUnderwater && surfaceState.is(Blocks.SAND) && RANDOM.nextDouble() < 0.5) {
+                        // 50% chance to bonemeal beach sand
+                        addSurfaceDecoration(level, targetPos, surfaceState);
+                    }
+                } else {
+                    // No plants mode - DESTROY all vegetation above surface!
+                    BlockPos abovePos = targetPos.above();
+                    BlockState aboveState = level.getBlockState(abovePos);
+
+                    // Remove grass, flowers, tall grass, etc.
+                    if (!aboveState.isAir() && !aboveState.liquid()) {
+                        // Flag 2 = no drops
+                        level.setBlock(abovePos, Blocks.AIR.defaultBlockState(), 2);
+                    }
                 }
             }
         }

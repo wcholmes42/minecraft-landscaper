@@ -5,7 +5,10 @@
       "Bash(mkdir:*)",
       "Bash(taskkill:*)",
       "Bash(find:*)",
-      "Bash(./gradlew clean:*)"
+      "Bash(./gradlew clean:*)",
+      "Bash(gh auth:*)",
+      "Bash(gh repo create:*)",
+      "Bash(gh repo view:*)"
     ],
     "deny": [],
     "ask": []
