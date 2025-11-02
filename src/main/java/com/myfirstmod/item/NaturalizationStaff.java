@@ -341,8 +341,8 @@ public class NaturalizationStaff extends Item {
             }
         }
 
-        // Default to original position if no surface found
-        return start;
+        // Return null if no surface found - caller will skip this column
+        return null;
     }
 
     private BlockState determineNaturalBlock(int relativeY, boolean isUnderwater, NaturalizationMode mode) {
