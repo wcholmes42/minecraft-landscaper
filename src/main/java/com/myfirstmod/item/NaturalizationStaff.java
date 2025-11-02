@@ -250,6 +250,7 @@ public class NaturalizationStaff extends Item {
 
                     // Remove grass, flowers, tall grass, etc.
                     if (!aboveState.isAir() && !aboveState.liquid()) {
+                        LOGGER.info("Clearing vegetation at {}: {}", abovePos, aboveState.getBlock());
                         // Flag 2 = no drops
                         level.setBlock(abovePos, Blocks.AIR.defaultBlockState(), 2);
                     }
