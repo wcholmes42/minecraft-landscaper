@@ -25,7 +25,6 @@ import org.slf4j.Logger;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
@@ -36,6 +35,7 @@ public class NaturalizationStaff extends Item {
     // Cooldown tracking for DoS protection
     private static final Map<UUID, Long> lastUseTime = new ConcurrentHashMap<>();
     private static final long COOLDOWN_MS = 1000; // 1 second cooldown
+    private static final long COOLDOWN_CLEANUP_THRESHOLD = 300000; // 5 minutes
 
     // Constants for vegetation chances
     private static final double LAND_VEGETATION_CHANCE = 0.075; // 7.5%
@@ -99,6 +99,12 @@ public class NaturalizationStaff extends Item {
         if (player != null && !player.isCreative()) {
             UUID playerId = player.getUUID();
             long now = System.currentTimeMillis();
+
+            // Periodic cleanup: remove entries older than 5 minutes (prevents memory leak)
+            if (ThreadLocalRandom.current().nextInt(100) == 0) { // 1% chance per use
+                lastUseTime.entrySet().removeIf(entry -> (now - entry.getValue()) > COOLDOWN_CLEANUP_THRESHOLD);
+            }
+
             Long lastUse = lastUseTime.get(playerId);
             if (lastUse != null && (now - lastUse) < COOLDOWN_MS) {
                 player.displayClientMessage(
