@@ -6,10 +6,10 @@ import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class BiomePalette {
-    private static final Random RANDOM = new Random();
+    // No static Random - using ThreadLocalRandom for thread safety
 
     public static Block getSurfaceBlock(Holder<Biome> biome, NaturalizationMode mode, boolean allowVariation) {
         // Path-only modes override biome
@@ -46,7 +46,7 @@ public class BiomePalette {
     }
 
     public static Block getVegetationBlock(Holder<Biome> biome) {
-        double roll = RANDOM.nextDouble();
+        double roll = ThreadLocalRandom.current().nextDouble();
 
         if (biome.is(Biomes.DESERT) || biome.is(Biomes.BADLANDS) || biome.is(Biomes.ERODED_BADLANDS) || biome.is(Biomes.WOODED_BADLANDS)) {
             // Desert: 80% dead bush, 20% cactus
@@ -72,7 +72,7 @@ public class BiomePalette {
             // Swamp: 40% tall grass, 30% ferns, 20% mushrooms, 10% lily pads
             if (roll < 0.40) return Blocks.TALL_GRASS;
             else if (roll < 0.70) return Blocks.FERN;
-            else if (roll < 0.90) return RANDOM.nextBoolean() ? Blocks.RED_MUSHROOM : Blocks.BROWN_MUSHROOM;
+            else if (roll < 0.90) return ThreadLocalRandom.current().nextBoolean() ? Blocks.RED_MUSHROOM : Blocks.BROWN_MUSHROOM;
             else return Blocks.LILY_PAD;
         } else {
             // Default plains/forest: existing variety (grass + flowers)
@@ -82,7 +82,7 @@ public class BiomePalette {
 
     private static Block getBeachSurfaceBlock(boolean allowVariation) {
         if (!allowVariation) return Blocks.SAND;
-        double roll = RANDOM.nextDouble();
+        double roll = ThreadLocalRandom.current().nextDouble();
         // 90% sand, 5% gravel, 5% coarse dirt
         if (roll < 0.90) return Blocks.SAND;
         else if (roll < 0.95) return Blocks.GRAVEL;
@@ -91,7 +91,7 @@ public class BiomePalette {
 
     private static Block getOceanSurfaceBlock(boolean allowVariation) {
         if (!allowVariation) return Blocks.SAND;
-        double roll = RANDOM.nextDouble();
+        double roll = ThreadLocalRandom.current().nextDouble();
         // 80% sand, 15% gravel, 5% clay
         if (roll < 0.80) return Blocks.SAND;
         else if (roll < 0.95) return Blocks.GRAVEL;
@@ -100,7 +100,7 @@ public class BiomePalette {
 
     private static Block getRiverSurfaceBlock(boolean allowVariation) {
         if (!allowVariation) return Blocks.SAND;
-        double roll = RANDOM.nextDouble();
+        double roll = ThreadLocalRandom.current().nextDouble();
         // 70% sand, 20% gravel, 10% clay
         if (roll < 0.70) return Blocks.SAND;
         else if (roll < 0.90) return Blocks.GRAVEL;
@@ -109,7 +109,7 @@ public class BiomePalette {
 
     private static Block getDesertSurfaceBlock(boolean allowVariation) {
         if (!allowVariation) return Blocks.SAND;
-        double roll = RANDOM.nextDouble();
+        double roll = ThreadLocalRandom.current().nextDouble();
         // 85% sand, 10% red sand, 5% sandstone
         if (roll < 0.85) return Blocks.SAND;
         else if (roll < 0.95) return Blocks.RED_SAND;
@@ -118,7 +118,7 @@ public class BiomePalette {
 
     private static Block getSavannaSurfaceBlock(boolean allowVariation) {
         if (!allowVariation) return Blocks.GRASS_BLOCK;
-        double roll = RANDOM.nextDouble();
+        double roll = ThreadLocalRandom.current().nextDouble();
         // 80% grass, 15% coarse dirt, 5% red sand
         if (roll < 0.80) return Blocks.GRASS_BLOCK;
         else if (roll < 0.95) return Blocks.COARSE_DIRT;
@@ -127,7 +127,7 @@ public class BiomePalette {
 
     private static Block getTaigaSurfaceBlock(boolean allowVariation) {
         if (!allowVariation) return Blocks.GRASS_BLOCK;
-        double roll = RANDOM.nextDouble();
+        double roll = ThreadLocalRandom.current().nextDouble();
         // 75% grass, 20% podzol, 5% coarse dirt
         if (roll < 0.75) return Blocks.GRASS_BLOCK;
         else if (roll < 0.95) return Blocks.PODZOL;
@@ -136,7 +136,7 @@ public class BiomePalette {
 
     private static Block getJungleSurfaceBlock(boolean allowVariation) {
         if (!allowVariation) return Blocks.GRASS_BLOCK;
-        double roll = RANDOM.nextDouble();
+        double roll = ThreadLocalRandom.current().nextDouble();
         // 70% grass, 25% podzol, 5% mossy cobblestone
         if (roll < 0.70) return Blocks.GRASS_BLOCK;
         else if (roll < 0.95) return Blocks.PODZOL;
@@ -145,14 +145,14 @@ public class BiomePalette {
 
     private static Block getMushroomSurfaceBlock(boolean allowVariation) {
         if (!allowVariation) return Blocks.MYCELIUM;
-        double roll = RANDOM.nextDouble();
+        double roll = ThreadLocalRandom.current().nextDouble();
         // 90% mycelium, 10% dirt
         return roll < 0.90 ? Blocks.MYCELIUM : Blocks.DIRT;
     }
 
     private static Block getSwampSurfaceBlock(boolean allowVariation) {
         if (!allowVariation) return Blocks.GRASS_BLOCK;
-        double roll = RANDOM.nextDouble();
+        double roll = ThreadLocalRandom.current().nextDouble();
         // 75% grass, 15% mud, 10% clay
         if (roll < 0.75) return Blocks.GRASS_BLOCK;
         else if (roll < 0.90) return Blocks.MUD;
@@ -161,7 +161,7 @@ public class BiomePalette {
 
     private static Block getDefaultSurfaceBlock(boolean allowVariation) {
         if (!allowVariation) return Blocks.GRASS_BLOCK;
-        double roll = RANDOM.nextDouble();
+        double roll = ThreadLocalRandom.current().nextDouble();
         // 85% grass, 8% gravel, 5% path, 2% farmland (original messy mode)
         if (roll < 0.02) return Blocks.FARMLAND;
         else if (roll < 0.07) return Blocks.DIRT_PATH;
@@ -175,7 +175,7 @@ public class BiomePalette {
         } else {
             // MESSY_PATH
             if (!allowVariation) return Blocks.DIRT_PATH;
-            double roll = RANDOM.nextDouble();
+            double roll = ThreadLocalRandom.current().nextDouble();
             if (roll < 0.75) return Blocks.DIRT_PATH;
             else if (roll < 0.85) return Blocks.GRAVEL;
             else if (roll < 0.95) return Blocks.GRASS_BLOCK;
@@ -185,7 +185,7 @@ public class BiomePalette {
 
     private static Block getDefaultVegetation() {
         // Original WFC-inspired variety for plains/forests
-        double roll = RANDOM.nextDouble();
+        double roll = ThreadLocalRandom.current().nextDouble();
 
         // 70% grass variants
         if (roll < 0.40) {
@@ -194,20 +194,20 @@ public class BiomePalette {
             return Blocks.TALL_GRASS;
         } else if (roll < 0.775) {
             // 12.5% 2-block tall plants
-            return RANDOM.nextBoolean() ? Blocks.LARGE_FERN : Blocks.TALL_GRASS;
+            return ThreadLocalRandom.current().nextBoolean() ? Blocks.LARGE_FERN : Blocks.TALL_GRASS;
         } else if (roll < 0.85) {
             // 7.5% fern
             return Blocks.FERN;
         } else if (roll < 0.933) {
             // 8.3% common flowers
-            return RANDOM.nextBoolean() ? Blocks.DANDELION : Blocks.POPPY;
+            return ThreadLocalRandom.current().nextBoolean() ? Blocks.DANDELION : Blocks.POPPY;
         } else {
             // 6.7% rare flowers
             Block[] rareFlowers = {
                 Blocks.BLUE_ORCHID, Blocks.ALLIUM, Blocks.AZURE_BLUET,
                 Blocks.OXEYE_DAISY, Blocks.CORNFLOWER, Blocks.LILY_OF_THE_VALLEY
             };
-            return rareFlowers[RANDOM.nextInt(rareFlowers.length)];
+            return rareFlowers[ThreadLocalRandom.current().nextInt(rareFlowers.length)];
         }
     }
 }

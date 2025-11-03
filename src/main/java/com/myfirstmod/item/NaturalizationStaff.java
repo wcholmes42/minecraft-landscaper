@@ -26,10 +26,21 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class NaturalizationStaff extends Item {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final Random RANDOM = new Random();
+
+    // Cooldown tracking for DoS protection
+    private static final Map<UUID, Long> lastUseTime = new ConcurrentHashMap<>();
+    private static final long COOLDOWN_MS = 1000; // 1 second cooldown
+
+    // Constants for vegetation chances
+    private static final double LAND_VEGETATION_CHANCE = 0.075; // 7.5%
+    private static final double UNDERWATER_VEGETATION_CHANCE = 0.075; // 7.5%
+    private static final double MESSY_UNDERWATER_VEGETATION_MULTIPLIER = 3.0; // 22.5%
 
     // Fixed configuration
     private static final int HEIGHT_ABOVE = 3;  // Blocks above click point
@@ -82,6 +93,21 @@ public class NaturalizationStaff extends Item {
         // Only run on server side
         if (level.isClientSide()) {
             return InteractionResult.SUCCESS;
+        }
+
+        // Cooldown check to prevent DoS/spam abuse
+        if (player != null && !player.isCreative()) {
+            UUID playerId = player.getUUID();
+            long now = System.currentTimeMillis();
+            Long lastUse = lastUseTime.get(playerId);
+            if (lastUse != null && (now - lastUse) < COOLDOWN_MS) {
+                player.displayClientMessage(
+                    Component.literal("Staff on cooldown! (" + (COOLDOWN_MS - (now - lastUse)) + "ms)"),
+                    true
+                );
+                return InteractionResult.FAIL;
+            }
+            lastUseTime.put(playerId, now);
         }
 
         // Check if overworld-only is enabled
@@ -346,7 +372,7 @@ public class NaturalizationStaff extends Item {
                     if (!isUnderwater && (surfaceState.is(Blocks.GRASS_BLOCK) || surfaceState.is(Blocks.SAND) ||
                         surfaceState.is(Blocks.PODZOL) || surfaceState.is(Blocks.MYCELIUM) || surfaceState.is(Blocks.MUD))) {
                         // 7.5% chance to attempt placing vegetation
-                        if (RANDOM.nextDouble() < 0.075) {
+                        if (ThreadLocalRandom.current().nextDouble() < LAND_VEGETATION_CHANCE) {
                             BlockPos abovePos = targetPos.above();
                             // Only place if air above
                             if (level.getBlockState(abovePos).isAir()) {
@@ -364,13 +390,13 @@ public class NaturalizationStaff extends Item {
                         // Underwater shoreline vegetation: kelp and seagrass
                         // Messy modes get 3x more vegetation (22.5% vs 7.5%)
                         double vegetationChance = mode.allowsVariation() ? 0.225 : 0.075;
-                        if (RANDOM.nextDouble() < vegetationChance) {
+                        if (ThreadLocalRandom.current().nextDouble() < vegetationChance) {
                             BlockPos abovePos = targetPos.above();
                             BlockState aboveState = level.getBlockState(abovePos);
                             // Only place if water above
                             if (aboveState.is(Blocks.WATER)) {
                                 // 60% seagrass, 40% kelp
-                                Block plantBlock = RANDOM.nextDouble() < 0.60 ? Blocks.SEAGRASS : Blocks.KELP;
+                                Block plantBlock = ThreadLocalRandom.current().nextDouble() < 0.60 ? Blocks.SEAGRASS : Blocks.KELP;
                                 level.setBlock(abovePos, plantBlock.defaultBlockState(), 2);
                             }
                         }
@@ -395,7 +421,7 @@ public class NaturalizationStaff extends Item {
     private BlockState getRandomVegetation() {
         // Weighted vegetation palette for natural aesthetics
         // Distribution: 40% short grass, 25% tall grass, 12.5% 2-tall plants, 7.5% fern, 5% common flowers, 2.5% rare flowers
-        double roll = RANDOM.nextDouble();
+        double roll = ThreadLocalRandom.current().nextDouble();
 
         // 40% short grass (most common)
         if (roll < 0.40) {
@@ -408,7 +434,7 @@ public class NaturalizationStaff extends Item {
         // 12.5% 2-block tall plants (half of tall grass %)
         else if (roll < 0.775) {
             Block[] tallPlants = {Blocks.LARGE_FERN, Blocks.TALL_GRASS};
-            return tallPlants[RANDOM.nextInt(tallPlants.length)].defaultBlockState();
+            return tallPlants[ThreadLocalRandom.current().nextInt(tallPlants.length)].defaultBlockState();
         }
         // 7.5% fern (halved from previous)
         else if (roll < 0.85) {
@@ -418,7 +444,7 @@ public class NaturalizationStaff extends Item {
         // 8.3% common flowers
         else if (roll < 0.933) {
             Block[] commonFlowers = {Blocks.DANDELION, Blocks.POPPY};
-            return commonFlowers[RANDOM.nextInt(commonFlowers.length)].defaultBlockState();
+            return commonFlowers[ThreadLocalRandom.current().nextInt(commonFlowers.length)].defaultBlockState();
         }
         // 4.2% rare flowers
         else {
@@ -430,7 +456,7 @@ public class NaturalizationStaff extends Item {
                 Blocks.CORNFLOWER,
                 Blocks.LILY_OF_THE_VALLEY
             };
-            return rareFlowers[RANDOM.nextInt(rareFlowers.length)].defaultBlockState();
+            return rareFlowers[ThreadLocalRandom.current().nextInt(rareFlowers.length)].defaultBlockState();
         }
     }
 
@@ -586,7 +612,7 @@ public class NaturalizationStaff extends Item {
             } else if (relativeY == 0) {
                 // Surface layer - messy mode adds variation
                 if (mode.allowsVariation()) {
-                    double roll = RANDOM.nextDouble();
+                    double roll = ThreadLocalRandom.current().nextDouble();
                     // 70% sand, 15% gravel, 10% mud, 5% coarse dirt
                     if (roll < 0.70) return Blocks.SAND.defaultBlockState();
                     else if (roll < 0.85) return Blocks.GRAVEL.defaultBlockState();
@@ -598,7 +624,7 @@ public class NaturalizationStaff extends Item {
             } else if (relativeY == -1) {
                 // First subsurface - messy mode adds variation
                 if (mode.allowsVariation()) {
-                    double roll = RANDOM.nextDouble();
+                    double roll = ThreadLocalRandom.current().nextDouble();
                     // 60% gravel, 30% sand, 10% clay
                     if (roll < 0.60) return Blocks.GRAVEL.defaultBlockState();
                     else if (roll < 0.90) return Blocks.SAND.defaultBlockState();
@@ -609,7 +635,7 @@ public class NaturalizationStaff extends Item {
             } else if (relativeY >= -3) {
                 // Mid subsurface - messy mode adds variation
                 if (mode.allowsVariation()) {
-                    double roll = RANDOM.nextDouble();
+                    double roll = ThreadLocalRandom.current().nextDouble();
                     // 50% sand, 30% gravel, 20% clay
                     if (roll < 0.50) return Blocks.SAND.defaultBlockState();
                     else if (roll < 0.80) return Blocks.GRAVEL.defaultBlockState();
@@ -642,7 +668,7 @@ public class NaturalizationStaff extends Item {
     }
 
     private BlockState getSurfaceBlock(NaturalizationMode mode) {
-        double roll = RANDOM.nextDouble();
+        double roll = ThreadLocalRandom.current().nextDouble();
 
         switch (mode) {
             case GRASS_ONLY:
