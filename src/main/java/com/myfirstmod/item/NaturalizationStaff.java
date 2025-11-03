@@ -359,9 +359,12 @@ public class NaturalizationStaff extends Item {
                                 }
                             }
                         }
-                    } else if (isUnderwater && (surfaceState.is(Blocks.SAND) || surfaceState.is(Blocks.GRAVEL))) {
+                    } else if (isUnderwater && (surfaceState.is(Blocks.SAND) || surfaceState.is(Blocks.GRAVEL) ||
+                                                surfaceState.is(Blocks.MUD) || surfaceState.is(Blocks.CLAY))) {
                         // Underwater shoreline vegetation: kelp and seagrass
-                        if (RANDOM.nextDouble() < 0.075) {
+                        // Messy modes get 3x more vegetation (22.5% vs 7.5%)
+                        double vegetationChance = mode.allowsVariation() ? 0.225 : 0.075;
+                        if (RANDOM.nextDouble() < vegetationChance) {
                             BlockPos abovePos = targetPos.above();
                             BlockState aboveState = level.getBlockState(abovePos);
                             // Only place if water above
@@ -577,15 +580,43 @@ public class NaturalizationStaff extends Item {
 
     private BlockState determineNaturalBlock(int relativeY, boolean isUnderwater, NaturalizationMode mode, net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome) {
         if (isUnderwater) {
-            // Underwater terrain layers (ocean floor) - unchanged
+            // Underwater terrain layers
             if (relativeY > 0) {
                 return Blocks.AIR.defaultBlockState();
             } else if (relativeY == 0) {
-                return Blocks.SAND.defaultBlockState();
+                // Surface layer - messy mode adds variation
+                if (mode.allowsVariation()) {
+                    double roll = RANDOM.nextDouble();
+                    // 70% sand, 15% gravel, 10% mud, 5% coarse dirt
+                    if (roll < 0.70) return Blocks.SAND.defaultBlockState();
+                    else if (roll < 0.85) return Blocks.GRAVEL.defaultBlockState();
+                    else if (roll < 0.95) return Blocks.MUD.defaultBlockState();
+                    else return Blocks.COARSE_DIRT.defaultBlockState();
+                } else {
+                    return Blocks.SAND.defaultBlockState();
+                }
             } else if (relativeY == -1) {
-                return Blocks.GRAVEL.defaultBlockState();
+                // First subsurface - messy mode adds variation
+                if (mode.allowsVariation()) {
+                    double roll = RANDOM.nextDouble();
+                    // 60% gravel, 30% sand, 10% clay
+                    if (roll < 0.60) return Blocks.GRAVEL.defaultBlockState();
+                    else if (roll < 0.90) return Blocks.SAND.defaultBlockState();
+                    else return Blocks.CLAY.defaultBlockState();
+                } else {
+                    return Blocks.GRAVEL.defaultBlockState();
+                }
             } else if (relativeY >= -3) {
-                return Blocks.SAND.defaultBlockState();
+                // Mid subsurface - messy mode adds variation
+                if (mode.allowsVariation()) {
+                    double roll = RANDOM.nextDouble();
+                    // 50% sand, 30% gravel, 20% clay
+                    if (roll < 0.50) return Blocks.SAND.defaultBlockState();
+                    else if (roll < 0.80) return Blocks.GRAVEL.defaultBlockState();
+                    else return Blocks.CLAY.defaultBlockState();
+                } else {
+                    return Blocks.SAND.defaultBlockState();
+                }
             } else if (relativeY >= -6) {
                 return Blocks.CLAY.defaultBlockState();
             } else {
