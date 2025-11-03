@@ -54,6 +54,7 @@ public class NaturalizationConfig {
             // Stone variants - common terrain
             "minecraft:stone",
             "minecraft:cobblestone",
+            "minecraft:mossy_cobblestone",
             "minecraft:andesite",
             "minecraft:diorite",
             "minecraft:granite",
@@ -71,6 +72,8 @@ public class NaturalizationConfig {
             "minecraft:grass_block",
             "minecraft:dirt_path",
             "minecraft:farmland",
+            "minecraft:mud",
+            "minecraft:muddy_mangrove_roots",
 
             // Sand and gravel
             "minecraft:sand",

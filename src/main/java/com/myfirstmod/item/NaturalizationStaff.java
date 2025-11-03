@@ -162,6 +162,8 @@ public class NaturalizationStaff extends Item {
 
                 if (surfacePos == null) continue;
 
+                // Detect biome for this column
+                net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome = level.getBiome(surfacePos);
                 boolean isUnderwater = isUnderwater(level, surfacePos);
 
                 // Simulate what blocks would be placed
@@ -172,10 +174,11 @@ public class NaturalizationStaff extends Item {
                     if (currentState.isAir() || currentState.liquid()) continue;
                     if (!NaturalizationConfig.getSafeBlocks().contains(currentState.getBlock())) continue;
 
-                    BlockState newState = determineNaturalBlock(i, isUnderwater, mode);
+                    BlockState newState = determineNaturalBlock(i, isUnderwater, mode, biome);
 
-                    // Check if placing grass but something above - would place dirt instead
-                    if (i == 0 && newState.is(Blocks.GRASS_BLOCK)) {
+                    // Check if placing grass-like block but something above - would place dirt instead
+                    if (i == 0 && (newState.is(Blocks.GRASS_BLOCK) || newState.is(Blocks.PODZOL) ||
+                                  newState.is(Blocks.MYCELIUM) || newState.is(Blocks.MUD))) {
                         BlockState blockAbove = level.getBlockState(targetPos.above());
                         if (!blockAbove.isAir() && !blockAbove.liquid()) {
                             newState = Blocks.DIRT.defaultBlockState();
@@ -261,8 +264,13 @@ public class NaturalizationStaff extends Item {
             return 0; // No solid blocks found
         }
 
+        // Detect biome at surface position for biome-specific palettes
+        net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome = level.getBiome(surfacePos);
+
         // Check if this is an underwater environment
         boolean isUnderwater = isUnderwater(level, surfacePos);
+
+        LOGGER.info("Column at {}: isUnderwater={}", surfacePos, isUnderwater);
 
         // PASS 1: Clear blocks to AIR (destroys vegetation above, terrain at/below surface)
         for (int i = HEIGHT_ABOVE; i >= -HEIGHT_BELOW; i--) {
@@ -275,18 +283,24 @@ public class NaturalizationStaff extends Item {
             }
 
             if (i > 0) {
-                // ABOVE surface: Only clear vegetation (grass, flowers, saplings, mushrooms, etc.)
+                // ABOVE surface: Clear all vegetation (grass, flowers, saplings, kelp, seagrass, etc.)
                 // Check if it's a plant-type block (extends BushBlock) or is replaceable
                 boolean isVegetation = currentState.canBeReplaced() ||
                                       currentState.getBlock() instanceof net.minecraft.world.level.block.BushBlock ||
-                                      currentState.getBlock() instanceof net.minecraft.world.level.block.SaplingBlock;
+                                      currentState.getBlock() instanceof net.minecraft.world.level.block.SaplingBlock ||
+                                      currentState.is(Blocks.KELP) ||
+                                      currentState.is(Blocks.KELP_PLANT) ||
+                                      currentState.is(Blocks.SEAGRASS) ||
+                                      currentState.is(Blocks.TALL_SEAGRASS);
 
                 if (isVegetation) {
+                    LOGGER.info("PASS1: Clearing vegetation at i={}, block={}", i, currentState.getBlock());
                     level.setBlock(targetPos, Blocks.AIR.defaultBlockState(), 2);
                 }
             } else {
                 // AT or BELOW surface: Only clear safe terrain blocks
                 if (NaturalizationConfig.getSafeBlocks().contains(currentState.getBlock())) {
+                    LOGGER.info("PASS1: Clearing safe block at i={}, block={}", i, currentState.getBlock());
                     level.setBlock(targetPos, Blocks.AIR.defaultBlockState(), 2);
                 }
             }
@@ -296,19 +310,22 @@ public class NaturalizationStaff extends Item {
         for (int i = 0; i >= -HEIGHT_BELOW; i--) {
             BlockPos targetPos = surfacePos.offset(0, i, 0);
 
-            // Determine what block should be here based on mode
-            BlockState newState = determineNaturalBlock(i, isUnderwater, mode);
+            // Use column-wide underwater detection (whole column is underwater or not)
+            BlockState newState = determineNaturalBlock(i, isUnderwater, mode, biome);
 
-            // Special check: If placing grass at surface, check if something is above
-            if (i == 0 && newState.is(Blocks.GRASS_BLOCK)) {
-                BlockState blockAbove = level.getBlockState(targetPos.above());
-                if (!blockAbove.isAir() && !blockAbove.liquid()) {
-                    // Something above grass - place dirt instead
-                    newState = Blocks.DIRT.defaultBlockState();
-                }
-            }
+            // Special check: If placing grass-like block at surface - DON'T convert to dirt
+            // Grass with vegetation above is fine! Only convert if there's a tree/structure
+            // For now, just place grass - vegetation gets cleared/replaced properly
+            // if (i == 0 && !isUnderwater && (newState.is(Blocks.GRASS_BLOCK) || newState.is(Blocks.PODZOL) ||
+            //               newState.is(Blocks.MYCELIUM) || newState.is(Blocks.MUD))) {
+            //     BlockState blockAbove = level.getBlockState(targetPos.above());
+            //     // Skip this check - it was causing grass→dirt conversion issues near water
+            // }
 
             // Place the block (flag 2 = no drops)
+            if (i == 0) {
+                LOGGER.info("PASS2: Placing {} at surface (i=0), isUnderwater={}", newState.getBlock(), isUnderwater);
+            }
             level.setBlock(targetPos, newState, 2);
             changed++;
 
@@ -325,26 +342,33 @@ public class NaturalizationStaff extends Item {
                 BlockState surfaceState = level.getBlockState(targetPos);
 
                 if (mode.shouldAddPlants()) {
-                    // Add plants mode - WFC-inspired aesthetic vegetation placement
-                    if (!isUnderwater && surfaceState.is(Blocks.GRASS_BLOCK)) {
-                        // 7.5% chance to attempt placing vegetation (tripled from 2.5%)
+                    // Add plants mode - Biome-specific WFC-inspired vegetation
+                    if (!isUnderwater && (surfaceState.is(Blocks.GRASS_BLOCK) || surfaceState.is(Blocks.SAND) ||
+                        surfaceState.is(Blocks.PODZOL) || surfaceState.is(Blocks.MYCELIUM) || surfaceState.is(Blocks.MUD))) {
+                        // 7.5% chance to attempt placing vegetation
                         if (RANDOM.nextDouble() < 0.075) {
                             BlockPos abovePos = targetPos.above();
                             // Only place if air above
                             if (level.getBlockState(abovePos).isAir()) {
-                                BlockState plantState = getRandomVegetation();
+                                // Get biome-specific vegetation
+                                Block plantBlock = BiomePalette.getVegetationBlock(biome);
+                                BlockState plantState = plantBlock.defaultBlockState();
                                 // WFC check: ensure aesthetic variety (no identical neighbors)
                                 if (shouldPlaceVegetation(level, abovePos, plantState)) {
                                     level.setBlock(abovePos, plantState, 2);
                                 }
                             }
                         }
-                    } else if (!isUnderwater && surfaceState.is(Blocks.SAND)) {
-                        // 1.5% chance for beach vegetation (dead bush)
-                        if (RANDOM.nextDouble() < 0.015) {
+                    } else if (isUnderwater && (surfaceState.is(Blocks.SAND) || surfaceState.is(Blocks.GRAVEL))) {
+                        // Underwater shoreline vegetation: kelp and seagrass
+                        if (RANDOM.nextDouble() < 0.075) {
                             BlockPos abovePos = targetPos.above();
-                            if (level.getBlockState(abovePos).isAir()) {
-                                level.setBlock(abovePos, Blocks.DEAD_BUSH.defaultBlockState(), 2);
+                            BlockState aboveState = level.getBlockState(abovePos);
+                            // Only place if water above
+                            if (aboveState.is(Blocks.WATER)) {
+                                // 60% seagrass, 40% kelp
+                                Block plantBlock = RANDOM.nextDouble() < 0.60 ? Blocks.SEAGRASS : Blocks.KELP;
+                                level.setBlock(abovePos, plantBlock.defaultBlockState(), 2);
                             }
                         }
                     }
@@ -433,12 +457,19 @@ public class NaturalizationStaff extends Item {
 
     private Item getResourceItemForBlock(BlockState state) {
         // Map blocks to their item equivalents
-        if (state.is(Blocks.GRASS_BLOCK)) return Items.DIRT; // Grass requires dirt
+        if (state.is(Blocks.GRASS_BLOCK)) return Items.DIRT;
         if (state.is(Blocks.DIRT)) return Items.DIRT;
-        if (state.is(Blocks.DIRT_PATH)) return Items.DIRT; // Dirt path requires dirt
-        if (state.is(Blocks.FARMLAND)) return Items.DIRT; // Farmland requires dirt
-        if (state.is(Blocks.STONE)) return Items.COBBLESTONE; // Stone requires cobblestone
+        if (state.is(Blocks.DIRT_PATH)) return Items.DIRT;
+        if (state.is(Blocks.FARMLAND)) return Items.DIRT;
+        if (state.is(Blocks.PODZOL)) return Items.DIRT;
+        if (state.is(Blocks.MYCELIUM)) return Items.DIRT;
+        if (state.is(Blocks.MUD)) return Items.MUD;
+        if (state.is(Blocks.COARSE_DIRT)) return Items.DIRT;
+        if (state.is(Blocks.STONE)) return Items.COBBLESTONE;
+        if (state.is(Blocks.MOSSY_COBBLESTONE)) return Items.MOSSY_COBBLESTONE;
         if (state.is(Blocks.SAND)) return Items.SAND;
+        if (state.is(Blocks.RED_SAND)) return Items.RED_SAND;
+        if (state.is(Blocks.SANDSTONE)) return Items.SANDSTONE;
         if (state.is(Blocks.GRAVEL)) return Items.GRAVEL;
         if (state.is(Blocks.CLAY)) return Items.CLAY_BALL;
         return null; // Unknown block
@@ -544,7 +575,7 @@ public class NaturalizationStaff extends Item {
         return null;
     }
 
-    private BlockState determineNaturalBlock(int relativeY, boolean isUnderwater, NaturalizationMode mode) {
+    private BlockState determineNaturalBlock(int relativeY, boolean isUnderwater, NaturalizationMode mode, net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome) {
         if (isUnderwater) {
             // Underwater terrain layers (ocean floor) - unchanged
             if (relativeY > 0) {
@@ -566,8 +597,9 @@ public class NaturalizationStaff extends Item {
                 // Above surface - AIR only
                 return Blocks.AIR.defaultBlockState();
             } else if (relativeY == 0) {
-                // SURFACE ONLY - use mode (grass/path/messy)
-                return getSurfaceBlock(mode);
+                // SURFACE ONLY - use biome-specific palette
+                Block surfaceBlock = BiomePalette.getSurfaceBlock(biome, mode, mode.allowsVariation());
+                return surfaceBlock.defaultBlockState();
             } else if (relativeY >= -3) {
                 // 1-3 blocks below surface - DIRT
                 return Blocks.DIRT.defaultBlockState();
