@@ -60,31 +60,9 @@ esac
 NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
 echo -e "${GREEN}New version: ${NEW_VERSION}${NC}"
 
-# Check for uncommitted changes
-if ! git diff-index --quiet HEAD --; then
-    echo -e "${YELLOW}Warning: You have uncommitted changes${NC}"
-    read -p "Continue anyway? (y/N) " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit 1
-    fi
-fi
-
 # Update version in gradle.properties
 echo -e "${YELLOW}Updating gradle.properties...${NC}"
 sed -i "s/^mod_version=.*$/mod_version=${NEW_VERSION}/" gradle.properties
-
-# Show changes
-echo -e "${GREEN}Version updated to ${NEW_VERSION}:${NC}"
-git diff gradle.properties
-
-# Confirm before committing
-read -p "Commit and push these changes? (y/N) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo -e "${YELLOW}Aborting. Changes have been made but not committed.${NC}"
-    exit 1
-fi
 
 # Commit changes
 echo -e "${YELLOW}Committing changes...${NC}"
@@ -100,7 +78,7 @@ echo -e "${YELLOW}Creating tag v${NEW_VERSION}...${NC}"
 git tag "v${NEW_VERSION}"
 
 echo -e "${YELLOW}Pushing to GitHub...${NC}"
-git push origin main
+git push origin master
 git push origin "v${NEW_VERSION}"
 
 echo -e "${GREEN}✓ Release v${NEW_VERSION} created!${NC}"
