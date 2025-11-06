@@ -10,8 +10,8 @@ public class ModPackets {
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
         new ResourceLocation(MyFirstMod.MODID, "main"),
         () -> PROTOCOL_VERSION,
-        PROTOCOL_VERSION::equals,
-        PROTOCOL_VERSION::equals
+        clientVersion -> true,  // Accept any client version - never block connections
+        serverVersion -> true   // Accept any server version - never block connections
     );
 
     private static int packetId = 0;
