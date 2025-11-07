@@ -1,11 +1,14 @@
 package com.wcholmes.landscaper;
 
 import com.mojang.logging.LogUtils;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.item.Item;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.registries.ForgeRegistries;
 import org.slf4j.Logger;
 
 @Mod.EventBusSubscriber(modid = Landscaper.MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
@@ -14,15 +17,12 @@ public class ModEventHandlers {
 
     @SubscribeEvent
     public static void onCreativeModeTabBuildContents(BuildCreativeModeTabContentsEvent event) {
-        LOGGER.info("Creative tab event fired for tab: {}", event.getTabKey());
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            LOGGER.info("Tools & Utilities tab - checking NATURALIZATION_STAFF");
-            LOGGER.info("NATURALIZATION_STAFF.isPresent(): {}", Landscaper.NATURALIZATION_STAFF.isPresent());
-            if (Landscaper.NATURALIZATION_STAFF.isPresent()) {
-                LOGGER.info("Adding NATURALIZATION_STAFF to creative tab");
-                event.accept(Landscaper.NATURALIZATION_STAFF.get());
-            } else {
-                LOGGER.error("NATURALIZATION_STAFF is NOT present - cannot add to creative tab!");
+            // In multiplayer, RegistryObject.isPresent() can return false after server sync
+            // Use direct registry lookup instead, which is multiplayer-safe
+            Item staff = ForgeRegistries.ITEMS.getValue(new ResourceLocation(Landscaper.MODID, "naturalization_staff"));
+            if (staff != null) {
+                event.accept(staff);
             }
         }
     }
