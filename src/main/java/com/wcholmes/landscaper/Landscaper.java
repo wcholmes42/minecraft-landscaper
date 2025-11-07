@@ -5,7 +5,9 @@ import com.wcholmes.landscaper.config.ConfigScreen;
 import com.wcholmes.landscaper.config.NaturalizationConfig;
 import com.wcholmes.landscaper.item.NaturalizationStaff;
 import com.wcholmes.landscaper.network.ModPackets;
+import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
+import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -35,8 +37,11 @@ public class Landscaper
         // Register setup method
         modEventBus.addListener(this::commonSetup);
 
-        // Register items
+        // Register items - MUST happen before creative tab listener
         ITEMS.register(modEventBus);
+
+        // Register creative tab listener - happens after item registration
+        modEventBus.addListener(this::addCreativeTab);
 
         // Register config screen
         net.minecraftforge.fml.ModLoadingContext.get().registerExtensionPoint(
@@ -58,5 +63,27 @@ public class Landscaper
         NaturalizationConfig.load();
 
         LOGGER.info("Naturalization Staff ready for terraforming!");
+    }
+
+    /**
+     * Adds mod items to creative mode tabs.
+     * Registered in constructor after ITEMS.register() to ensure proper initialization order.
+     */
+    private void addCreativeTab(BuildCreativeModeTabContentsEvent event)
+    {
+        LOGGER.info("buildCreativeTabs called for tab: {}", event.getTabKey().location());
+
+        // Add the Naturalization Staff to the tools tab
+        if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
+            LOGGER.info("Processing TOOLS_AND_UTILITIES tab");
+            LOGGER.info("NATURALIZATION_STAFF.isPresent() = {}", NATURALIZATION_STAFF.isPresent());
+
+            if (NATURALIZATION_STAFF.isPresent()) {
+                LOGGER.info("Adding Naturalization Staff to creative tab");
+                event.accept(NATURALIZATION_STAFF.get());
+            } else {
+                LOGGER.warn("NATURALIZATION_STAFF is not present during creative tab building!");
+            }
+        }
     }
 }
