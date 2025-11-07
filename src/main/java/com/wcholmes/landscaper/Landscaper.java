@@ -7,6 +7,7 @@ import com.wcholmes.landscaper.item.NaturalizationStaff;
 import com.wcholmes.landscaper.network.ModPackets;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
@@ -102,8 +103,8 @@ public class Landscaper
                     Item directLookup = ForgeRegistries.ITEMS.getValue(NATURALIZATION_STAFF.getId());
                     LOGGER.warn("Direct registry lookup result: {}", directLookup);
                     if (directLookup != null) {
-                        LOGGER.warn("Item exists in registry! Adding directly...");
-                        event.accept(directLookup);
+                        LOGGER.warn("Item exists in registry! Adding as ItemStack with count=1...");
+                        event.accept(new ItemStack(directLookup, 1));
                     }
                 } catch (Exception e) {
                     LOGGER.error("Error during direct registry lookup", e);
