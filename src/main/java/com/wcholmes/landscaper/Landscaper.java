@@ -32,16 +32,24 @@ public class Landscaper
 
     public Landscaper()
     {
+        LOGGER.info("=== Landscaper constructor starting ===");
+        LOGGER.info("NATURALIZATION_STAFF defined: {}", NATURALIZATION_STAFF != null);
+        LOGGER.info("NATURALIZATION_STAFF.isPresent() in constructor: {}", NATURALIZATION_STAFF.isPresent());
+
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
         // Register setup method
         modEventBus.addListener(this::commonSetup);
 
         // Register items - MUST happen before creative tab listener
+        LOGGER.info("Calling ITEMS.register(modEventBus)...");
         ITEMS.register(modEventBus);
+        LOGGER.info("ITEMS.register() completed");
+        LOGGER.info("NATURALIZATION_STAFF.isPresent() after ITEMS.register(): {}", NATURALIZATION_STAFF.isPresent());
 
         // Register creative tab listener - happens after item registration
         modEventBus.addListener(this::addCreativeTab);
+        LOGGER.info("Creative tab listener registered");
 
         // Register config screen
         net.minecraftforge.fml.ModLoadingContext.get().registerExtensionPoint(
@@ -50,11 +58,13 @@ public class Landscaper
                 (mc, screen) -> new ConfigScreen(screen)
             )
         );
+        LOGGER.info("=== Landscaper constructor complete ===");
     }
 
     private void commonSetup(final FMLCommonSetupEvent event)
     {
         LOGGER.info("Terrain Naturalization Tools is loading!");
+        LOGGER.info("NATURALIZATION_STAFF.isPresent() in commonSetup: {}", NATURALIZATION_STAFF.isPresent());
 
         // Register network packets
         event.enqueueWork(ModPackets::register);
@@ -63,6 +73,7 @@ public class Landscaper
         NaturalizationConfig.load();
 
         LOGGER.info("Naturalization Staff ready for terraforming!");
+        LOGGER.info("NATURALIZATION_STAFF.isPresent() at end of commonSetup: {}", NATURALIZATION_STAFF.isPresent());
     }
 
     /**
@@ -76,6 +87,8 @@ public class Landscaper
         // Add the Naturalization Staff to the tools tab
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             LOGGER.info("Processing TOOLS_AND_UTILITIES tab");
+            LOGGER.info("NATURALIZATION_STAFF object: {}", NATURALIZATION_STAFF);
+            LOGGER.info("NATURALIZATION_STAFF.getId(): {}", NATURALIZATION_STAFF.getId());
             LOGGER.info("NATURALIZATION_STAFF.isPresent() = {}", NATURALIZATION_STAFF.isPresent());
 
             if (NATURALIZATION_STAFF.isPresent()) {
@@ -83,6 +96,18 @@ public class Landscaper
                 event.accept(NATURALIZATION_STAFF.get());
             } else {
                 LOGGER.warn("NATURALIZATION_STAFF is not present during creative tab building!");
+                LOGGER.warn("RegistryObject ID: {}", NATURALIZATION_STAFF.getId());
+                LOGGER.warn("Trying to query registry directly...");
+                try {
+                    Item directLookup = ForgeRegistries.ITEMS.getValue(NATURALIZATION_STAFF.getId());
+                    LOGGER.warn("Direct registry lookup result: {}", directLookup);
+                    if (directLookup != null) {
+                        LOGGER.warn("Item exists in registry! Adding directly...");
+                        event.accept(directLookup);
+                    }
+                } catch (Exception e) {
+                    LOGGER.error("Error during direct registry lookup", e);
+                }
             }
         }
     }
