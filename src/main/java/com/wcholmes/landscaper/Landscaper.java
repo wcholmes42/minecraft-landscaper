@@ -93,8 +93,8 @@ public class Landscaper
             LOGGER.info("NATURALIZATION_STAFF.isPresent() = {}", NATURALIZATION_STAFF.isPresent());
 
             if (NATURALIZATION_STAFF.isPresent()) {
-                LOGGER.info("Adding Naturalization Staff to creative tab");
-                event.accept(NATURALIZATION_STAFF.get());
+                LOGGER.info("Adding Naturalization Staff to creative tab as ItemStack");
+                event.accept(new ItemStack(NATURALIZATION_STAFF.get(), 1));
             } else {
                 LOGGER.warn("NATURALIZATION_STAFF is not present during creative tab building!");
                 LOGGER.warn("RegistryObject ID: {}", NATURALIZATION_STAFF.getId());
