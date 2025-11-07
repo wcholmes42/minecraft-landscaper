@@ -45,6 +45,9 @@ public class Landscaper
         LOGGER.info("ITEMS.register() completed");
         LOGGER.info("NATURALIZATION_STAFF.isPresent() after ITEMS.register(): {}", NATURALIZATION_STAFF.isPresent());
 
+        // Add items to creative tabs
+        modEventBus.addListener(this::addCreative);
+
         // Register config screen
         net.minecraftforge.fml.ModLoadingContext.get().registerExtensionPoint(
             net.minecraftforge.client.ConfigScreenHandler.ConfigScreenFactory.class,
@@ -68,5 +71,12 @@ public class Landscaper
 
         LOGGER.info("Naturalization Staff ready for terraforming!");
         LOGGER.info("NATURALIZATION_STAFF.isPresent() at end of commonSetup: {}", NATURALIZATION_STAFF.isPresent());
+    }
+
+    private void addCreative(net.minecraftforge.event.BuildCreativeModeTabContentsEvent event)
+    {
+        // Add the Naturalization Staff to the tools tab
+        if (event.getTabKey() == net.minecraft.world.item.CreativeModeTabs.TOOLS_AND_UTILITIES)
+            event.accept(NATURALIZATION_STAFF);
     }
 }
