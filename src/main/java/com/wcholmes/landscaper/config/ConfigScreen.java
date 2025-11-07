@@ -1,4 +1,4 @@
-package com.myfirstmod.config;
+package com.wcholmes.landscaper.config;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;

@@ -1,7 +1,7 @@
-package com.myfirstmod.item;
+package com.wcholmes.landscaper.item;
 
 import com.mojang.logging.LogUtils;
-import com.myfirstmod.config.NaturalizationConfig;
+import com.wcholmes.landscaper.config.NaturalizationConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;

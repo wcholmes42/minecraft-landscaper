@@ -1,4 +1,4 @@
-package com.myfirstmod.config;
+package com.wcholmes.landscaper.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;

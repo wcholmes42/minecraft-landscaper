@@ -1,10 +1,10 @@
-package com.myfirstmod;
+package com.wcholmes.landscaper;
 
-import com.myfirstmod.config.ConfigScreen;
-import com.myfirstmod.item.NaturalizationMode;
-import com.myfirstmod.item.NaturalizationStaff;
-import com.myfirstmod.network.CycleModePacket;
-import com.myfirstmod.network.ModPackets;
+import com.wcholmes.landscaper.config.ConfigScreen;
+import com.wcholmes.landscaper.item.NaturalizationMode;
+import com.wcholmes.landscaper.item.NaturalizationStaff;
+import com.wcholmes.landscaper.network.CycleModePacket;
+import com.wcholmes.landscaper.network.ModPackets;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
@@ -15,7 +15,7 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
-@Mod.EventBusSubscriber(modid = MyFirstMod.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
+@Mod.EventBusSubscriber(modid = Landscaper.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public class ClientEventHandler {
 
     @SubscribeEvent
@@ -56,7 +56,7 @@ public class ClientEventHandler {
         }
     }
 
-    @Mod.EventBusSubscriber(modid = MyFirstMod.MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+    @Mod.EventBusSubscriber(modid = Landscaper.MODID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
     public static class ModEventHandler {
         @SubscribeEvent
         public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event) {

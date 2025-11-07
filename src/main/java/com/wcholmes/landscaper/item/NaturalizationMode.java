@@ -1,4 +1,4 @@
-package com.myfirstmod.item;
+package com.wcholmes.landscaper.item;
 
 public enum NaturalizationMode {
     GRASS_ONLY("Grass Only", false, false, false),

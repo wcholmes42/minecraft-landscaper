@@ -1,7 +1,7 @@
-package com.myfirstmod.network;
+package com.wcholmes.landscaper.network;
 
-import com.myfirstmod.item.NaturalizationMode;
-import com.myfirstmod.item.NaturalizationStaff;
+import com.wcholmes.landscaper.item.NaturalizationMode;
+import com.wcholmes.landscaper.item.NaturalizationStaff;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;

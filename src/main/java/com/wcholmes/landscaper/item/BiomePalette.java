@@ -1,4 +1,4 @@
-package com.myfirstmod.item;
+package com.wcholmes.landscaper.item;
 
 import net.minecraft.core.Holder;
 import net.minecraft.world.level.biome.Biome;

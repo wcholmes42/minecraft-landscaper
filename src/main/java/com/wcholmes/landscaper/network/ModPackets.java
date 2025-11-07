@@ -1,6 +1,6 @@
-package com.myfirstmod.network;
+package com.wcholmes.landscaper.network;
 
-import com.myfirstmod.MyFirstMod;
+import com.wcholmes.landscaper.Landscaper;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.simple.SimpleChannel;
@@ -8,7 +8,7 @@ import net.minecraftforge.network.simple.SimpleChannel;
 public class ModPackets {
     private static final String PROTOCOL_VERSION = "1";
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
-        new ResourceLocation(MyFirstMod.MODID, "main"),
+        new ResourceLocation(Landscaper.MODID, "main"),
         () -> PROTOCOL_VERSION,
         clientVersion -> true,  // Accept any client version - never block connections
         serverVersion -> true   // Accept any server version - never block connections
