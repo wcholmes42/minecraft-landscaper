@@ -73,7 +73,7 @@ public class MyFirstMod
     private void addCreative(BuildCreativeModeTabContentsEvent event)
     {
         // Add the Naturalization Staff to the tools tab
-        if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES)
+        if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES && NATURALIZATION_STAFF.isPresent())
             event.accept(NATURALIZATION_STAFF.get());
     }
 }
