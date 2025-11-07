@@ -76,7 +76,13 @@ public class Landscaper
     private void addCreative(net.minecraftforge.event.BuildCreativeModeTabContentsEvent event)
     {
         // Add the Naturalization Staff to the tools tab
-        if (event.getTabKey() == net.minecraft.world.item.CreativeModeTabs.TOOLS_AND_UTILITIES)
-            event.accept(NATURALIZATION_STAFF);
+        if (event.getTabKey() == net.minecraft.world.item.CreativeModeTabs.TOOLS_AND_UTILITIES) {
+            // Look up item directly from registry to avoid RegistryObject invalidation after server sync
+            net.minecraft.world.item.Item staff = net.minecraftforge.registries.ForgeRegistries.ITEMS.getValue(
+                new net.minecraft.resources.ResourceLocation(MODID, "naturalization_staff"));
+            if (staff != null) {
+                event.accept(staff);
+            }
+        }
     }
 }
