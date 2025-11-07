@@ -11,7 +11,9 @@ public class ModEventHandlers {
     @SubscribeEvent
     public static void onCreativeModeTabBuildContents(BuildCreativeModeTabContentsEvent event) {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            event.accept(Landscaper.NATURALIZATION_STAFF);
+            if (Landscaper.NATURALIZATION_STAFF.isPresent()) {
+                event.accept(Landscaper.NATURALIZATION_STAFF.get());
+            }
         }
     }
 }
