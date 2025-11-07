@@ -5,10 +5,7 @@ import com.wcholmes.landscaper.config.ConfigScreen;
 import com.wcholmes.landscaper.config.NaturalizationConfig;
 import com.wcholmes.landscaper.item.NaturalizationStaff;
 import com.wcholmes.landscaper.network.ModPackets;
-import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
-import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
@@ -42,15 +39,11 @@ public class Landscaper
         // Register setup method
         modEventBus.addListener(this::commonSetup);
 
-        // Register items - MUST happen before creative tab listener
+        // Register items
         LOGGER.info("Calling ITEMS.register(modEventBus)...");
         ITEMS.register(modEventBus);
         LOGGER.info("ITEMS.register() completed");
         LOGGER.info("NATURALIZATION_STAFF.isPresent() after ITEMS.register(): {}", NATURALIZATION_STAFF.isPresent());
-
-        // Register creative tab listener - happens after item registration
-        modEventBus.addListener(this::addCreativeTab);
-        LOGGER.info("Creative tab listener registered");
 
         // Register config screen
         net.minecraftforge.fml.ModLoadingContext.get().registerExtensionPoint(
@@ -75,18 +68,5 @@ public class Landscaper
 
         LOGGER.info("Naturalization Staff ready for terraforming!");
         LOGGER.info("NATURALIZATION_STAFF.isPresent() at end of commonSetup: {}", NATURALIZATION_STAFF.isPresent());
-    }
-
-    /**
-     * Adds mod items to creative mode tabs.
-     * BuildCreativeModeTabContentsEvent always fires after registration is complete,
-     * so we can safely call .get() on RegistryObjects without checking isPresent().
-     */
-    private void addCreativeTab(BuildCreativeModeTabContentsEvent event)
-    {
-        // Add the Naturalization Staff to the tools tab
-        if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            event.accept(NATURALIZATION_STAFF.get());
-        }
     }
 }
