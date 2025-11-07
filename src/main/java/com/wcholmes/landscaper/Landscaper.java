@@ -79,37 +79,14 @@ public class Landscaper
 
     /**
      * Adds mod items to creative mode tabs.
-     * Registered in constructor after ITEMS.register() to ensure proper initialization order.
+     * BuildCreativeModeTabContentsEvent always fires after registration is complete,
+     * so we can safely call .get() on RegistryObjects without checking isPresent().
      */
     private void addCreativeTab(BuildCreativeModeTabContentsEvent event)
     {
-        LOGGER.info("buildCreativeTabs called for tab: {}", event.getTabKey().location());
-
         // Add the Naturalization Staff to the tools tab
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            LOGGER.info("Processing TOOLS_AND_UTILITIES tab");
-            LOGGER.info("NATURALIZATION_STAFF object: {}", NATURALIZATION_STAFF);
-            LOGGER.info("NATURALIZATION_STAFF.getId(): {}", NATURALIZATION_STAFF.getId());
-            LOGGER.info("NATURALIZATION_STAFF.isPresent() = {}", NATURALIZATION_STAFF.isPresent());
-
-            if (NATURALIZATION_STAFF.isPresent()) {
-                LOGGER.info("Adding Naturalization Staff to creative tab as ItemStack");
-                event.accept(new ItemStack(NATURALIZATION_STAFF.get(), 1));
-            } else {
-                LOGGER.warn("NATURALIZATION_STAFF is not present during creative tab building!");
-                LOGGER.warn("RegistryObject ID: {}", NATURALIZATION_STAFF.getId());
-                LOGGER.warn("Trying to query registry directly...");
-                try {
-                    Item directLookup = ForgeRegistries.ITEMS.getValue(NATURALIZATION_STAFF.getId());
-                    LOGGER.warn("Direct registry lookup result: {}", directLookup);
-                    if (directLookup != null) {
-                        LOGGER.warn("Item exists in registry! Adding as ItemStack with count=1...");
-                        event.accept(new ItemStack(directLookup, 1));
-                    }
-                } catch (Exception e) {
-                    LOGGER.error("Error during direct registry lookup", e);
-                }
-            }
+            event.accept(NATURALIZATION_STAFF);
         }
     }
 }
