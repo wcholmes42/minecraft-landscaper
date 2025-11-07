@@ -86,7 +86,7 @@ public class Landscaper
     {
         // Add the Naturalization Staff to the tools tab
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            event.accept(NATURALIZATION_STAFF);
+            event.accept(NATURALIZATION_STAFF.get());
         }
     }
 }
