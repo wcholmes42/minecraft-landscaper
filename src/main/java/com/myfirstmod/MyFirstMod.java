@@ -5,13 +5,8 @@ import com.myfirstmod.config.ConfigScreen;
 import com.myfirstmod.config.NaturalizationConfig;
 import com.myfirstmod.item.NaturalizationStaff;
 import com.myfirstmod.network.ModPackets;
-import net.minecraft.world.item.BlockItem;
-import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.state.BlockBehaviour;
-import net.minecraft.world.level.material.MapColor;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.BuildCreativeModeTabContentsEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -30,27 +25,10 @@ public class MyFirstMod
     public static final String MODID = "landscaper";
     private static final Logger LOGGER = LogUtils.getLogger();
 
-    // Registry for blocks
-    public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, MODID);
     // Registry for items
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, MODID);
 
-    // Create a custom block - this will appear in the game!
-    public static final RegistryObject<Block> RUBY_BLOCK = BLOCKS.register("ruby_block",
-        () -> new Block(BlockBehaviour.Properties.of()
-            .mapColor(MapColor.COLOR_RED)
-            .strength(3.0f, 3.0f)
-            .requiresCorrectToolForDrops()));
-
-    // Create a block item so the block can be held in inventory
-    public static final RegistryObject<Item> RUBY_BLOCK_ITEM = ITEMS.register("ruby_block",
-        () -> new BlockItem(RUBY_BLOCK.get(), new Item.Properties()));
-
-    // Create a custom item - a ruby gem!
-    public static final RegistryObject<Item> RUBY = ITEMS.register("ruby",
-        () -> new Item(new Item.Properties()));
-
-    // Create the Naturalization Staff - the real mod!
+    // Create the Naturalization Staff
     public static final RegistryObject<Item> NATURALIZATION_STAFF = ITEMS.register("naturalization_staff",
         () -> new NaturalizationStaff(new Item.Properties().stacksTo(1)));
 
@@ -61,8 +39,7 @@ public class MyFirstMod
         // Register setup method
         modEventBus.addListener(this::commonSetup);
 
-        // Register our blocks and items
-        BLOCKS.register(modEventBus);
+        // Register items
         ITEMS.register(modEventBus);
 
         // Register for game events
@@ -95,16 +72,8 @@ public class MyFirstMod
 
     private void addCreative(BuildCreativeModeTabContentsEvent event)
     {
-        // Add our ruby block to the building blocks creative tab
-        if (event.getTabKey() == CreativeModeTabs.BUILDING_BLOCKS)
-            event.accept(RUBY_BLOCK_ITEM);
-
-        // Add our ruby item to the ingredients creative tab
-        if (event.getTabKey() == CreativeModeTabs.INGREDIENTS)
-            event.accept(RUBY);
-
         // Add the Naturalization Staff to the tools tab
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES)
-            event.accept(NATURALIZATION_STAFF);
+            event.accept(NATURALIZATION_STAFF.get());
     }
 }
