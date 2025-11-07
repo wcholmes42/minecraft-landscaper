@@ -20,7 +20,10 @@ public class ModEvents {
     public static void buildCreativeTabs(BuildCreativeModeTabContentsEvent event) {
         // Add the Naturalization Staff to the tools tab
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            event.accept(Landscaper.NATURALIZATION_STAFF);
+            // Check if registry object is present to avoid timing issues
+            if (Landscaper.NATURALIZATION_STAFF.isPresent()) {
+                event.accept(Landscaper.NATURALIZATION_STAFF.get());
+            }
         }
     }
 }
