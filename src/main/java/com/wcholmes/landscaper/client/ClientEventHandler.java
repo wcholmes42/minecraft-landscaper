@@ -65,4 +65,14 @@ public class ClientEventHandler {
             event.register(KeyBindings.openSettings);
         }
     }
+
+    // Register config screen (client-side only)
+    static {
+        net.minecraftforge.fml.ModLoadingContext.get().registerExtensionPoint(
+            net.minecraftforge.client.ConfigScreenHandler.ConfigScreenFactory.class,
+            () -> new net.minecraftforge.client.ConfigScreenHandler.ConfigScreenFactory(
+                (mc, screen) -> new ConfigScreen(screen)
+            )
+        );
+    }
 }
