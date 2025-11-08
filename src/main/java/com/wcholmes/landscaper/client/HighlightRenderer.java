@@ -81,63 +81,109 @@ public class HighlightRenderer {
         float b = 0.0f;
         float a = 0.8f;
 
-        double centerX = center.getX() + 0.5;
-        double centerY = center.getY() + 1.0; // Slightly above block
-        double centerZ = center.getZ() + 0.5;
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level == null) {
+            poseStack.popPose();
+            return;
+        }
 
-        if (isCircle) {
-            // Draw circle outline
-            int segments = Math.max(32, radius * 4); // More segments for larger radius
-            for (int i = 0; i < segments; i++) {
-                double angle1 = (i * 2 * Math.PI) / segments;
-                double angle2 = ((i + 1) * 2 * Math.PI) / segments;
+        // Iterate through the area and find edge blocks
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                // Check if within radius (circle or square)
+                boolean withinRadius = isCircle ? (x * x + z * z <= radius * radius) : true;
 
-                double x1 = centerX + Math.cos(angle1) * radius;
-                double z1 = centerZ + Math.sin(angle1) * radius;
-                double x2 = centerX + Math.cos(angle2) * radius;
-                double z2 = centerZ + Math.sin(angle2) * radius;
+                if (!withinRadius) continue;
 
-                builder.vertex(matrix, (float) x1, (float) centerY, (float) z1)
-                       .color(r, g, b, a)
-                       .normal(0f, 1f, 0f)
-                       .endVertex();
-                builder.vertex(matrix, (float) x2, (float) centerY, (float) z2)
-                       .color(r, g, b, a)
-                       .normal(0f, 1f, 0f)
-                       .endVertex();
+                // Check if this is an edge block
+                boolean isEdge = false;
+                if (isCircle) {
+                    // For circles, check if any neighbor is outside radius
+                    int[][] neighbors = {{-1,0}, {1,0}, {0,-1}, {0,1}};
+                    for (int[] n : neighbors) {
+                        int nx = x + n[0];
+                        int nz = z + n[1];
+                        if (nx * nx + nz * nz > radius * radius) {
+                            isEdge = true;
+                            break;
+                        }
+                    }
+                } else {
+                    // For squares, check if on perimeter
+                    isEdge = (x == -radius || x == radius || z == -radius || z == radius);
+                }
+
+                if (isEdge) {
+                    BlockPos pos = center.offset(x, 0, z);
+                    BlockPos surfacePos = findSurface(mc.level, pos);
+
+                    if (surfacePos != null) {
+                        // Draw outline box around this surface block
+                        drawBlockOutline(matrix, builder, surfacePos, r, g, b, a);
+                    }
+                }
             }
-        } else {
-            // Draw square outline
-            double x1 = centerX - radius;
-            double x2 = centerX + radius;
-            double z1 = centerZ - radius;
-            double z2 = centerZ + radius;
-
-            // Top edge
-            builder.vertex(matrix, (float) x1, (float) centerY, (float) z1)
-                   .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
-            builder.vertex(matrix, (float) x2, (float) centerY, (float) z1)
-                   .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
-
-            // Right edge
-            builder.vertex(matrix, (float) x2, (float) centerY, (float) z1)
-                   .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
-            builder.vertex(matrix, (float) x2, (float) centerY, (float) z2)
-                   .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
-
-            // Bottom edge
-            builder.vertex(matrix, (float) x2, (float) centerY, (float) z2)
-                   .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
-            builder.vertex(matrix, (float) x1, (float) centerY, (float) z2)
-                   .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
-
-            // Left edge
-            builder.vertex(matrix, (float) x1, (float) centerY, (float) z2)
-                   .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
-            builder.vertex(matrix, (float) x1, (float) centerY, (float) z1)
-                   .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
         }
 
         poseStack.popPose();
+    }
+
+    private static void drawBlockOutline(Matrix4f matrix, VertexConsumer builder,
+                                         BlockPos pos, float r, float g, float b, float a) {
+        double minX = pos.getX();
+        double minY = pos.getY() + 1.0; // Top of block
+        double minZ = pos.getZ();
+        double maxX = pos.getX() + 1.0;
+        double maxY = pos.getY() + 1.05; // Slightly above for visibility
+        double maxZ = pos.getZ() + 1.0;
+
+        // Draw 4 horizontal lines forming a square on top of the block
+        // Bottom-front edge
+        builder.vertex(matrix, (float) minX, (float) minY, (float) minZ)
+               .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
+        builder.vertex(matrix, (float) maxX, (float) minY, (float) minZ)
+               .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
+
+        // Right edge
+        builder.vertex(matrix, (float) maxX, (float) minY, (float) minZ)
+               .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
+        builder.vertex(matrix, (float) maxX, (float) minY, (float) maxZ)
+               .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
+
+        // Top-back edge
+        builder.vertex(matrix, (float) maxX, (float) minY, (float) maxZ)
+               .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
+        builder.vertex(matrix, (float) minX, (float) minY, (float) maxZ)
+               .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
+
+        // Left edge
+        builder.vertex(matrix, (float) minX, (float) minY, (float) maxZ)
+               .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
+        builder.vertex(matrix, (float) minX, (float) minY, (float) minZ)
+               .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
+    }
+
+    private static BlockPos findSurface(net.minecraft.world.level.Level level, BlockPos start) {
+        // Search upward first
+        for (int y = 0; y < 10; y++) {
+            BlockPos checkPos = start.offset(0, y, 0);
+            net.minecraft.world.level.block.state.BlockState current = level.getBlockState(checkPos);
+
+            if (NaturalizationConfig.getSafeBlocks().contains(current.getBlock())) {
+                return checkPos;
+            }
+        }
+
+        // Search downward
+        for (int y = 0; y > -15; y--) {
+            BlockPos checkPos = start.offset(0, y, 0);
+            net.minecraft.world.level.block.state.BlockState current = level.getBlockState(checkPos);
+
+            if (NaturalizationConfig.getSafeBlocks().contains(current.getBlock())) {
+                return checkPos;
+            }
+        }
+
+        return null;
     }
 }
