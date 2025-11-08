@@ -1,14 +1,15 @@
 package com.wcholmes.landscaper;
 
 import com.mojang.logging.LogUtils;
-import com.wcholmes.landscaper.config.ConfigScreen;
 import com.wcholmes.landscaper.config.NaturalizationConfig;
 import com.wcholmes.landscaper.item.NaturalizationStaff;
 import com.wcholmes.landscaper.network.ModPackets;
 import net.minecraft.world.item.Item;
+import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
+import net.minecraftforge.fml.loading.FMLEnvironment;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.registries.DeferredRegister;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -48,13 +49,10 @@ public class Landscaper
         // Add items to creative tabs
         modEventBus.addListener(this::addCreative);
 
-        // Register config screen
-        net.minecraftforge.fml.ModLoadingContext.get().registerExtensionPoint(
-            net.minecraftforge.client.ConfigScreenHandler.ConfigScreenFactory.class,
-            () -> new net.minecraftforge.client.ConfigScreenHandler.ConfigScreenFactory(
-                (mc, screen) -> new ConfigScreen(screen)
-            )
-        );
+        // Register config screen (client-side only)
+        if (FMLEnvironment.dist == Dist.CLIENT) {
+            registerConfigScreen();
+        }
         LOGGER.info("=== Landscaper constructor complete ===");
     }
 
@@ -84,5 +82,16 @@ public class Landscaper
                 event.accept(staff);
             }
         }
+    }
+
+    // Client-side only method to register config screen
+    private void registerConfigScreen()
+    {
+        net.minecraftforge.fml.ModLoadingContext.get().registerExtensionPoint(
+            net.minecraftforge.client.ConfigScreenHandler.ConfigScreenFactory.class,
+            () -> new net.minecraftforge.client.ConfigScreenHandler.ConfigScreenFactory(
+                (mc, screen) -> new com.wcholmes.landscaper.config.ConfigScreen(screen)
+            )
+        );
     }
 }
