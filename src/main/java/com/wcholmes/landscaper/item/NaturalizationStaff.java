@@ -186,9 +186,10 @@ public class NaturalizationStaff extends Item {
     private void calculateResourcesNeeded(Level level, BlockPos center, NaturalizationMode mode, Map<Item, Integer> resourcesNeeded) {
         // Dry run to calculate what resources would be needed without placing blocks
         int radius = NaturalizationConfig.getRadius();
+        int effectiveRadius = radius - 1; // radius 1 = 0 range, radius 2 = 1 range, etc.
 
-        for (int dx = -radius; dx <= radius; dx++) {
-            for (int dz = -radius; dz <= radius; dz++) {
+        for (int dx = -effectiveRadius; dx <= effectiveRadius; dx++) {
+            for (int dz = -effectiveRadius; dz <= effectiveRadius; dz++) {
                 BlockPos columnPos = center.offset(dx, 0, dz);
                 BlockPos surfacePos = findSurface(level, columnPos);
 
@@ -235,6 +236,7 @@ public class NaturalizationStaff extends Item {
 
         // Get radius from config
         int radius = NaturalizationConfig.getRadius();
+        int effectiveRadius = radius - 1; // radius 1 = 0 range, radius 2 = 1 range, etc.
 
         // Get player position for safety checks (prevent falling through world)
         BlockPos playerPos = player != null ? player.blockPosition() : null;
@@ -245,10 +247,10 @@ public class NaturalizationStaff extends Item {
             mode.getDisplayName(), center, radius, isCircle ? "circle" : "square", messyEdge);
 
         // Iterate through the area
-        for (int x = -radius; x <= radius; x++) {
-            for (int z = -radius; z <= radius; z++) {
+        for (int x = -effectiveRadius; x <= effectiveRadius; x++) {
+            for (int z = -effectiveRadius; z <= effectiveRadius; z++) {
                 // Check if within radius (circle or square based on config)
-                boolean withinRadius = isCircle ? (x * x + z * z <= radius * radius) : true;
+                boolean withinRadius = isCircle ? (x * x + z * z <= effectiveRadius * effectiveRadius) : true;
 
                 // Apply messy edge effect if enabled
                 if (withinRadius && messyEdge) {
@@ -630,19 +632,22 @@ public class NaturalizationStaff extends Item {
     }
 
     private boolean shouldApplyMessyEdge(int x, int z, int radius, boolean isCircle) {
+        // effectiveRadius calculation: radius 1 = 0, radius 2 = 1, etc.
+        int effectiveRadius = radius - 1;
+
         // Calculate distance from center
         double distance = isCircle ? Math.sqrt(x * x + z * z) : Math.max(Math.abs(x), Math.abs(z));
-        double edgeDistance = radius - distance;
+        double edgeDistance = effectiveRadius - distance;
 
         // If we're more than 2 blocks from edge, always include
         if (edgeDistance > 2) {
             return true;
         }
 
-        // If we're exactly at or beyond radius, randomly extend by 1-2 blocks
+        // If we're exactly at or beyond effective radius, randomly extend by 1-2 blocks
         if (edgeDistance <= 0) {
             int extension = ThreadLocalRandom.current().nextInt(3); // 0, 1, or 2 blocks
-            return distance <= radius + extension;
+            return distance <= effectiveRadius + extension;
         }
 
         // We're within 2 blocks of edge - randomly fade out

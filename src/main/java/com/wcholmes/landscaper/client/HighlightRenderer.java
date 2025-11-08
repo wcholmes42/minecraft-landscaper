@@ -20,6 +20,8 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.joml.Matrix4f;
 
+import java.util.Random;
+
 @Mod.EventBusSubscriber(value = Dist.CLIENT)
 public class HighlightRenderer {
 
@@ -58,14 +60,15 @@ public class HighlightRenderer {
         // Get config values
         int radius = NaturalizationConfig.getRadius();
         boolean isCircle = NaturalizationConfig.isCircleShape();
+        boolean messyEdge = NaturalizationConfig.isMessyEdge();
 
         // Render the highlight
         renderHighlight(event.getPoseStack(), event.getCamera().getPosition(),
-                       targetPos, radius, isCircle, mc.renderBuffers().bufferSource());
+                       targetPos, radius, isCircle, messyEdge, mc.renderBuffers().bufferSource());
     }
 
     private static void renderHighlight(PoseStack poseStack, Vec3 cameraPos,
-                                        BlockPos center, int radius, boolean isCircle,
+                                        BlockPos center, int radius, boolean isCircle, boolean messyEdge,
                                         MultiBufferSource.BufferSource bufferSource) {
         poseStack.pushPose();
 
@@ -75,10 +78,10 @@ public class HighlightRenderer {
         VertexConsumer builder = bufferSource.getBuffer(RenderType.lines());
         Matrix4f matrix = poseStack.last().pose();
 
-        // Color: Green with alpha
-        float r = 0.0f;
+        // Color: White with alpha
+        float r = 1.0f;
         float g = 1.0f;
-        float b = 0.0f;
+        float b = 1.0f;
         float a = 0.8f;
 
         Minecraft mc = Minecraft.getInstance();
@@ -87,33 +90,19 @@ public class HighlightRenderer {
             return;
         }
 
-        // Iterate through the area and find edge blocks
-        for (int x = -radius; x <= radius; x++) {
-            for (int z = -radius; z <= radius; z++) {
+        // Iterate through the area and show all affected blocks
+        int effectiveRadius = radius - 1; // radius 1 = 0 range, radius 2 = 1 range, etc.
+        for (int x = -effectiveRadius; x <= effectiveRadius; x++) {
+            for (int z = -effectiveRadius; z <= effectiveRadius; z++) {
                 // Check if within radius (circle or square)
-                boolean withinRadius = isCircle ? (x * x + z * z <= radius * radius) : true;
+                boolean withinRadius = isCircle ? (x * x + z * z <= effectiveRadius * effectiveRadius) : true;
 
-                if (!withinRadius) continue;
-
-                // Check if this is an edge block
-                boolean isEdge = false;
-                if (isCircle) {
-                    // For circles, check if any neighbor is outside radius
-                    int[][] neighbors = {{-1,0}, {1,0}, {0,-1}, {0,1}};
-                    for (int[] n : neighbors) {
-                        int nx = x + n[0];
-                        int nz = z + n[1];
-                        if (nx * nx + nz * nz > radius * radius) {
-                            isEdge = true;
-                            break;
-                        }
-                    }
-                } else {
-                    // For squares, check if on perimeter
-                    isEdge = (x == -radius || x == radius || z == -radius || z == radius);
+                // Apply messy edge effect if enabled
+                if (withinRadius && messyEdge) {
+                    withinRadius = shouldApplyMessyEdge(x, z, radius, isCircle, center);
                 }
 
-                if (isEdge) {
+                if (withinRadius) {
                     BlockPos pos = center.offset(x, 0, z);
                     BlockPos surfacePos = findSurface(mc.level, pos);
 
@@ -185,5 +174,35 @@ public class HighlightRenderer {
         }
 
         return null;
+    }
+
+    private static boolean shouldApplyMessyEdge(int x, int z, int radius, boolean isCircle, BlockPos center) {
+        // effectiveRadius calculation: radius 1 = 0, radius 2 = 1, etc.
+        int effectiveRadius = radius - 1;
+
+        // Calculate distance from center
+        double distance = isCircle ? Math.sqrt(x * x + z * z) : Math.max(Math.abs(x), Math.abs(z));
+        double edgeDistance = effectiveRadius - distance;
+
+        // If we're more than 2 blocks from edge, always include
+        if (edgeDistance > 2) {
+            return true;
+        }
+
+        // Use deterministic random based on position so highlight is consistent
+        // Combine center position with offset for unique seed per block
+        long seed = ((long)center.getX() + x) * 31L + ((long)center.getZ() + z) * 37L;
+        Random random = new Random(seed);
+
+        // If we're exactly at or beyond effective radius, randomly extend by 1-2 blocks
+        if (edgeDistance <= 0) {
+            int extension = random.nextInt(3); // 0, 1, or 2 blocks
+            return distance <= effectiveRadius + extension;
+        }
+
+        // We're within 2 blocks of edge - randomly fade out
+        // Closer to edge = higher chance of being excluded
+        double fadeChance = (2.0 - edgeDistance) / 3.0; // 0% at edge-2, 33% at edge-1, 66% at edge
+        return random.nextDouble() > fadeChance;
     }
 }
