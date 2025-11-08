@@ -2,5 +2,8 @@
   "item.landscaper.naturalization_staff": "Naturalization Staff",
   "key.categories.landscaper": "Landscaper Mod",
   "key.landscaper.cycle_mode": "Cycle Naturalization Mode",
-  "key.landscaper.open_settings": "Open Landscaper Settings"
+  "key.landscaper.open_settings": "Open Landscaper Settings",
+  "key.landscaper.toggle_highlight": "Toggle Highlight Radius",
+  "key.landscaper.toggle_messy_edge": "Toggle Messy Edge",
+  "key.landscaper.toggle_shape": "Toggle Circle/Square Shape"
 }

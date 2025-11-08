@@ -53,6 +53,36 @@ public class ClientEventHandler {
             if (player != null && KeyBindings.openSettings.consumeClick()) {
                 mc.setScreen(new ConfigScreen(mc.screen));
             }
+
+            // Handle toggle highlight
+            if (player != null && KeyBindings.toggleHighlight.consumeClick()) {
+                com.wcholmes.landscaper.config.NaturalizationConfig.toggleHighlight();
+                boolean enabled = com.wcholmes.landscaper.config.NaturalizationConfig.showHighlight();
+                player.displayClientMessage(
+                    Component.literal("§6Highlight: §e" + (enabled ? "ON" : "OFF")),
+                    true // Action bar
+                );
+            }
+
+            // Handle toggle messy edge
+            if (player != null && KeyBindings.toggleMessyEdge.consumeClick()) {
+                com.wcholmes.landscaper.config.NaturalizationConfig.toggleMessyEdge();
+                boolean enabled = com.wcholmes.landscaper.config.NaturalizationConfig.isMessyEdge();
+                player.displayClientMessage(
+                    Component.literal("§6Messy Edge: §e" + (enabled ? "ON" : "OFF")),
+                    true // Action bar
+                );
+            }
+
+            // Handle toggle shape
+            if (player != null && KeyBindings.toggleShape.consumeClick()) {
+                com.wcholmes.landscaper.config.NaturalizationConfig.toggleShape();
+                boolean isCircle = com.wcholmes.landscaper.config.NaturalizationConfig.isCircleShape();
+                player.displayClientMessage(
+                    Component.literal("§6Shape: §e" + (isCircle ? "Circle" : "Square")),
+                    true // Action bar
+                );
+            }
         }
     }
 
@@ -63,6 +93,9 @@ public class ClientEventHandler {
             KeyBindings.register();
             event.register(KeyBindings.cycleMode);
             event.register(KeyBindings.openSettings);
+            event.register(KeyBindings.toggleHighlight);
+            event.register(KeyBindings.toggleMessyEdge);
+            event.register(KeyBindings.toggleShape);
         }
     }
 

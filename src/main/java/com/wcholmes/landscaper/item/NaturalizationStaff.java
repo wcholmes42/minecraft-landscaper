@@ -239,13 +239,23 @@ public class NaturalizationStaff extends Item {
         // Get player position for safety checks (prevent falling through world)
         BlockPos playerPos = player != null ? player.blockPosition() : null;
 
-        LOGGER.info("Starting {} naturalization at {} with radius {}", mode.getDisplayName(), center, radius);
+        boolean isCircle = NaturalizationConfig.isCircleShape();
+        boolean messyEdge = NaturalizationConfig.isMessyEdge();
+        LOGGER.info("Starting {} naturalization at {} with radius {}, shape={}, messyEdge={}",
+            mode.getDisplayName(), center, radius, isCircle ? "circle" : "square", messyEdge);
 
         // Iterate through the area
         for (int x = -radius; x <= radius; x++) {
             for (int z = -radius; z <= radius; z++) {
-                // Check if within circular radius
-                if (x * x + z * z <= radius * radius) {
+                // Check if within radius (circle or square based on config)
+                boolean withinRadius = isCircle ? (x * x + z * z <= radius * radius) : true;
+
+                // Apply messy edge effect if enabled
+                if (withinRadius && messyEdge) {
+                    withinRadius = shouldApplyMessyEdge(x, z, radius, isCircle);
+                }
+
+                if (withinRadius) {
                     // Find the top solid block in this column
                     BlockPos columnPos = center.offset(x, 0, z);
 
@@ -617,6 +627,28 @@ public class NaturalizationStaff extends Item {
 
         // Return null if no surface found - caller will skip this column
         return null;
+    }
+
+    private boolean shouldApplyMessyEdge(int x, int z, int radius, boolean isCircle) {
+        // Calculate distance from center
+        double distance = isCircle ? Math.sqrt(x * x + z * z) : Math.max(Math.abs(x), Math.abs(z));
+        double edgeDistance = radius - distance;
+
+        // If we're more than 2 blocks from edge, always include
+        if (edgeDistance > 2) {
+            return true;
+        }
+
+        // If we're exactly at or beyond radius, randomly extend by 1-2 blocks
+        if (edgeDistance <= 0) {
+            int extension = ThreadLocalRandom.current().nextInt(3); // 0, 1, or 2 blocks
+            return distance <= radius + extension;
+        }
+
+        // We're within 2 blocks of edge - randomly fade out
+        // Closer to edge = higher chance of being excluded
+        double fadeChance = (2.0 - edgeDistance) / 3.0; // 0% at edge-2, 33% at edge-1, 66% at edge
+        return ThreadLocalRandom.current().nextDouble() > fadeChance;
     }
 
     private BlockState determineNaturalBlock(int relativeY, boolean isUnderwater, NaturalizationMode mode, net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome) {

@@ -8,7 +8,16 @@
       "Bash(./gradlew clean:*)",
       "Bash(gh auth:*)",
       "Bash(gh repo create:*)",
-      "Bash(gh repo view:*)"
+      "Bash(gh repo view:*)",
+      "Bash(unzip:*)",
+      "Bash(cat:*)",
+      "Bash(del nul)",
+      "Bash(./release.sh:*)",
+      "Bash(gh run:*)",
+      "Bash(gh release view:*)",
+      "Bash(gh release download:*)",
+      "Bash(ssh root@192.168.68.42:*)",
+      "Bash(scp:*)"
     ],
     "deny": [],
     "ask": []
