@@ -236,6 +236,9 @@ public class NaturalizationStaff extends Item {
         // Get radius from config
         int radius = NaturalizationConfig.getRadius();
 
+        // Get player position for safety checks (prevent falling through world)
+        BlockPos playerPos = player != null ? player.blockPosition() : null;
+
         LOGGER.info("Starting {} naturalization at {} with radius {}", mode.getDisplayName(), center, radius);
 
         // Iterate through the area
@@ -258,7 +261,7 @@ public class NaturalizationStaff extends Item {
                     }
 
                     // Naturalize this column (each column checked independently!)
-                    blocksChanged += naturalizeColumn(level, columnPos, mode, resourcesNeeded);
+                    blocksChanged += naturalizeColumn(level, columnPos, mode, resourcesNeeded, playerPos);
                 }
             }
         }
@@ -286,7 +289,7 @@ public class NaturalizationStaff extends Item {
         return blocksChanged > 0;
     }
 
-    private int naturalizeColumn(Level level, BlockPos pos, NaturalizationMode mode, Map<Item, Integer> resourcesNeeded) {
+    private int naturalizeColumn(Level level, BlockPos pos, NaturalizationMode mode, Map<Item, Integer> resourcesNeeded, BlockPos playerPos) {
         int changed = 0;
 
         // Find the surface level (topmost solid block)
@@ -294,6 +297,12 @@ public class NaturalizationStaff extends Item {
 
         if (surfacePos == null) {
             return 0; // No solid blocks found
+        }
+
+        // Safety check: Don't modify columns directly under the player (prevent falling)
+        if (playerPos != null && pos.getX() == playerPos.getX() && pos.getZ() == playerPos.getZ()) {
+            LOGGER.info("Skipping column at {} - player is standing here!", pos);
+            return 0;
         }
 
         // Detect biome at surface position for biome-specific palettes
