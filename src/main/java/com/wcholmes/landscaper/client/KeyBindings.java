@@ -1,4 +1,4 @@
-package com.wcholmes.landscaper;
+package com.wcholmes.landscaper.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.minecraft.client.KeyMapping;

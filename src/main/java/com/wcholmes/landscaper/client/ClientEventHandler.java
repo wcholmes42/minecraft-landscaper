@@ -1,6 +1,8 @@
-package com.wcholmes.landscaper;
+package com.wcholmes.landscaper.client;
 
+import com.wcholmes.landscaper.Landscaper;
 import com.wcholmes.landscaper.config.ConfigScreen;
+import com.wcholmes.landscaper.config.NaturalizationConfig;
 import com.wcholmes.landscaper.item.NaturalizationMode;
 import com.wcholmes.landscaper.item.NaturalizationStaff;
 import com.wcholmes.landscaper.network.CycleModePacket;
@@ -17,6 +19,10 @@ import net.minecraftforge.fml.common.Mod;
 
 @Mod.EventBusSubscriber(modid = Landscaper.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public class ClientEventHandler {
+
+    // Minecraft color codes for chat messages
+    private static final String COLOR_LABEL = "§6";  // Gold
+    private static final String COLOR_VALUE = "§e";  // Yellow
 
     @SubscribeEvent
     public static void onClientTick(TickEvent.ClientTickEvent event) {
@@ -43,7 +49,7 @@ public class ClientEventHandler {
 
                     // Show mode change message
                     player.displayClientMessage(
-                        Component.literal("§6Naturalization Mode: §e" + nextMode.getDisplayName()),
+                        Component.literal(COLOR_LABEL + "Naturalization Mode: " + COLOR_VALUE + nextMode.getDisplayName()),
                         true // Action bar
                     );
                 }
@@ -56,30 +62,30 @@ public class ClientEventHandler {
 
             // Handle toggle highlight
             if (player != null && KeyBindings.toggleHighlight.consumeClick()) {
-                com.wcholmes.landscaper.config.NaturalizationConfig.toggleHighlight();
-                boolean enabled = com.wcholmes.landscaper.config.NaturalizationConfig.showHighlight();
+                NaturalizationConfig.toggleHighlight();
+                boolean enabled = NaturalizationConfig.showHighlight();
                 player.displayClientMessage(
-                    Component.literal("§6Highlight: §e" + (enabled ? "ON" : "OFF")),
+                    Component.literal(COLOR_LABEL + "Highlight: " + COLOR_VALUE + (enabled ? "ON" : "OFF")),
                     true // Action bar
                 );
             }
 
             // Handle toggle messy edge
             if (player != null && KeyBindings.toggleMessyEdge.consumeClick()) {
-                com.wcholmes.landscaper.config.NaturalizationConfig.toggleMessyEdge();
-                boolean enabled = com.wcholmes.landscaper.config.NaturalizationConfig.isMessyEdge();
+                NaturalizationConfig.toggleMessyEdge();
+                boolean enabled = NaturalizationConfig.isMessyEdge();
                 player.displayClientMessage(
-                    Component.literal("§6Messy Edge: §e" + (enabled ? "ON" : "OFF")),
+                    Component.literal(COLOR_LABEL + "Messy Edge: " + COLOR_VALUE + (enabled ? "ON" : "OFF")),
                     true // Action bar
                 );
             }
 
             // Handle toggle shape
             if (player != null && KeyBindings.toggleShape.consumeClick()) {
-                com.wcholmes.landscaper.config.NaturalizationConfig.toggleShape();
-                boolean isCircle = com.wcholmes.landscaper.config.NaturalizationConfig.isCircleShape();
+                NaturalizationConfig.toggleShape();
+                boolean isCircle = NaturalizationConfig.isCircleShape();
                 player.displayClientMessage(
-                    Component.literal("§6Shape: §e" + (isCircle ? "Circle" : "Square")),
+                    Component.literal(COLOR_LABEL + "Shape: " + COLOR_VALUE + (isCircle ? "Circle" : "Square")),
                     true // Action bar
                 );
             }

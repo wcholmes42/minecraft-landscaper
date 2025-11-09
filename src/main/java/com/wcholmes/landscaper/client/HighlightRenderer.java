@@ -1,9 +1,12 @@
 package com.wcholmes.landscaper.client;
 
+import com.mojang.blaze3d.platform.GlStateManager;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.wcholmes.landscaper.config.NaturalizationConfig;
 import com.wcholmes.landscaper.item.NaturalizationStaff;
+import com.wcholmes.landscaper.util.TerrainUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -20,10 +23,15 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.joml.Matrix4f;
 
-import java.util.Random;
-
 @Mod.EventBusSubscriber(value = Dist.CLIENT)
 public class HighlightRenderer {
+
+    // Rendering constants
+    private static final float HIGHLIGHT_Y_OFFSET = 1.01f;  // Just above block surface
+    private static final float HIGHLIGHT_COLOR_R = 1.0f;   // White
+    private static final float HIGHLIGHT_COLOR_G = 1.0f;
+    private static final float HIGHLIGHT_COLOR_B = 1.0f;
+    private static final float HIGHLIGHT_COLOR_A = 1.0f;   // Full opacity for better visibility
 
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
@@ -75,14 +83,12 @@ public class HighlightRenderer {
         // Translate to world position relative to camera
         poseStack.translate(-cameraPos.x, -cameraPos.y, -cameraPos.z);
 
+        // Enable polygon offset to prevent z-fighting and moiré patterns
+        RenderSystem.enablePolygonOffset();
+        RenderSystem.polygonOffset(-3.0f, -3.0f);  // Push lines away from surfaces in depth buffer
+
         VertexConsumer builder = bufferSource.getBuffer(RenderType.lines());
         Matrix4f matrix = poseStack.last().pose();
-
-        // Color: White with alpha
-        float r = 1.0f;
-        float g = 1.0f;
-        float b = 1.0f;
-        float a = 0.8f;
 
         Minecraft mc = Minecraft.getInstance();
         if (mc.level == null) {
@@ -92,117 +98,74 @@ public class HighlightRenderer {
 
         // Iterate through the area and show all affected blocks
         int effectiveRadius = radius - 1; // radius 1 = 0 range, radius 2 = 1 range, etc.
-        for (int x = -effectiveRadius; x <= effectiveRadius; x++) {
-            for (int z = -effectiveRadius; z <= effectiveRadius; z++) {
-                // Check if within radius (circle or square)
-                boolean withinRadius = isCircle ? (x * x + z * z <= effectiveRadius * effectiveRadius) : true;
 
-                // Apply messy edge effect if enabled
-                if (withinRadius && messyEdge) {
-                    withinRadius = shouldApplyMessyEdge(x, z, radius, isCircle, center);
+        // Expand search range if messy edge is enabled (can extend up to 2 blocks beyond normal radius)
+        int searchRadius = messyEdge ? effectiveRadius + 2 : effectiveRadius;
+
+        for (int x = -searchRadius; x <= searchRadius; x++) {
+            for (int z = -searchRadius; z <= searchRadius; z++) {
+                boolean withinRadius;
+
+                if (messyEdge) {
+                    // Use messy edge logic for all blocks in expanded range
+                    withinRadius = TerrainUtils.shouldApplyMessyEdge(x, z, radius, isCircle, center);
+                } else {
+                    // Standard circle or square check
+                    withinRadius = isCircle ? (x * x + z * z <= effectiveRadius * effectiveRadius) : true;
                 }
 
                 if (withinRadius) {
                     BlockPos pos = center.offset(x, 0, z);
-                    BlockPos surfacePos = findSurface(mc.level, pos);
+                    BlockPos surfacePos = TerrainUtils.findSurface(mc.level, pos);
 
                     if (surfacePos != null) {
                         // Draw outline box around this surface block
-                        drawBlockOutline(matrix, builder, surfacePos, r, g, b, a);
+                        drawBlockOutline(matrix, builder, surfacePos, HIGHLIGHT_COLOR_R, HIGHLIGHT_COLOR_G, HIGHLIGHT_COLOR_B, HIGHLIGHT_COLOR_A);
                     }
                 }
             }
         }
+
+        // Disable polygon offset after rendering
+        RenderSystem.polygonOffset(0.0f, 0.0f);
+        RenderSystem.disablePolygonOffset();
 
         poseStack.popPose();
     }
 
     private static void drawBlockOutline(Matrix4f matrix, VertexConsumer builder,
                                          BlockPos pos, float r, float g, float b, float a) {
-        double minX = pos.getX();
-        double minY = pos.getY() + 1.0; // Top of block
-        double minZ = pos.getZ();
-        double maxX = pos.getX() + 1.0;
-        double maxY = pos.getY() + 1.05; // Slightly above for visibility
-        double maxZ = pos.getZ() + 1.0;
+        float minX = pos.getX();
+        float y = pos.getY() + HIGHLIGHT_Y_OFFSET; // Slightly above top of block
+        float minZ = pos.getZ();
+        float maxX = pos.getX() + 1.0f;
+        float maxZ = pos.getZ() + 1.0f;
 
-        // Draw 4 horizontal lines forming a square on top of the block
-        // Bottom-front edge
-        builder.vertex(matrix, (float) minX, (float) minY, (float) minZ)
-               .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
-        builder.vertex(matrix, (float) maxX, (float) minY, (float) minZ)
-               .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
+        // Draw 4 lines forming a square on top of the block
+        // All lines at same Y height to avoid any rendering inconsistencies
 
-        // Right edge
-        builder.vertex(matrix, (float) maxX, (float) minY, (float) minZ)
+        // North edge (along X axis, min Z)
+        builder.vertex(matrix, minX, y, minZ)
                .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
-        builder.vertex(matrix, (float) maxX, (float) minY, (float) maxZ)
+        builder.vertex(matrix, maxX, y, minZ)
                .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
 
-        // Top-back edge
-        builder.vertex(matrix, (float) maxX, (float) minY, (float) maxZ)
+        // East edge (along Z axis, max X)
+        builder.vertex(matrix, maxX, y, minZ)
                .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
-        builder.vertex(matrix, (float) minX, (float) minY, (float) maxZ)
+        builder.vertex(matrix, maxX, y, maxZ)
                .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
 
-        // Left edge
-        builder.vertex(matrix, (float) minX, (float) minY, (float) maxZ)
+        // South edge (along X axis, max Z)
+        builder.vertex(matrix, maxX, y, maxZ)
                .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
-        builder.vertex(matrix, (float) minX, (float) minY, (float) minZ)
+        builder.vertex(matrix, minX, y, maxZ)
                .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
-    }
 
-    private static BlockPos findSurface(net.minecraft.world.level.Level level, BlockPos start) {
-        // Search upward first
-        for (int y = 0; y < 10; y++) {
-            BlockPos checkPos = start.offset(0, y, 0);
-            net.minecraft.world.level.block.state.BlockState current = level.getBlockState(checkPos);
-
-            if (NaturalizationConfig.getSafeBlocks().contains(current.getBlock())) {
-                return checkPos;
-            }
-        }
-
-        // Search downward
-        for (int y = 0; y > -15; y--) {
-            BlockPos checkPos = start.offset(0, y, 0);
-            net.minecraft.world.level.block.state.BlockState current = level.getBlockState(checkPos);
-
-            if (NaturalizationConfig.getSafeBlocks().contains(current.getBlock())) {
-                return checkPos;
-            }
-        }
-
-        return null;
-    }
-
-    private static boolean shouldApplyMessyEdge(int x, int z, int radius, boolean isCircle, BlockPos center) {
-        // effectiveRadius calculation: radius 1 = 0, radius 2 = 1, etc.
-        int effectiveRadius = radius - 1;
-
-        // Calculate distance from center
-        double distance = isCircle ? Math.sqrt(x * x + z * z) : Math.max(Math.abs(x), Math.abs(z));
-        double edgeDistance = effectiveRadius - distance;
-
-        // If we're more than 2 blocks from edge, always include
-        if (edgeDistance > 2) {
-            return true;
-        }
-
-        // Use deterministic random based on position so highlight is consistent
-        // Combine center position with offset for unique seed per block
-        long seed = ((long)center.getX() + x) * 31L + ((long)center.getZ() + z) * 37L;
-        Random random = new Random(seed);
-
-        // If we're exactly at or beyond effective radius, randomly extend by 1-2 blocks
-        if (edgeDistance <= 0) {
-            int extension = random.nextInt(3); // 0, 1, or 2 blocks
-            return distance <= effectiveRadius + extension;
-        }
-
-        // We're within 2 blocks of edge - randomly fade out
-        // Closer to edge = higher chance of being excluded
-        double fadeChance = (2.0 - edgeDistance) / 3.0; // 0% at edge-2, 33% at edge-1, 66% at edge
-        return random.nextDouble() > fadeChance;
+        // West edge (along Z axis, min X)
+        builder.vertex(matrix, minX, y, maxZ)
+               .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
+        builder.vertex(matrix, minX, y, minZ)
+               .color(r, g, b, a).normal(0f, 1f, 0f).endVertex();
     }
 }

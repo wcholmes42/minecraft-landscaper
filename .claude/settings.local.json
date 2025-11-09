@@ -17,7 +17,9 @@
       "Bash(gh release view:*)",
       "Bash(gh release download:*)",
       "Bash(ssh root@192.168.68.42:*)",
-      "Bash(scp:*)"
+      "Bash(scp:*)",
+      "Bash(./gradlew build:*)",
+      "Bash(md5sum:*)"
     ],
     "deny": [],
     "ask": []

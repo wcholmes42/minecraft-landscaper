@@ -2,6 +2,7 @@ package com.wcholmes.landscaper.item;
 
 import com.mojang.logging.LogUtils;
 import com.wcholmes.landscaper.config.NaturalizationConfig;
+import com.wcholmes.landscaper.util.TerrainUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -191,7 +192,7 @@ public class NaturalizationStaff extends Item {
         for (int dx = -effectiveRadius; dx <= effectiveRadius; dx++) {
             for (int dz = -effectiveRadius; dz <= effectiveRadius; dz++) {
                 BlockPos columnPos = center.offset(dx, 0, dz);
-                BlockPos surfacePos = findSurface(level, columnPos);
+                BlockPos surfacePos = TerrainUtils.findSurface(level, columnPos);
 
                 if (surfacePos == null) continue;
 
@@ -246,23 +247,33 @@ public class NaturalizationStaff extends Item {
         LOGGER.info("Starting {} naturalization at {} with radius {}, shape={}, messyEdge={}",
             mode.getDisplayName(), center, radius, isCircle ? "circle" : "square", messyEdge);
 
-        // Iterate through the area
-        for (int x = -effectiveRadius; x <= effectiveRadius; x++) {
-            for (int z = -effectiveRadius; z <= effectiveRadius; z++) {
-                // Check if within radius (circle or square based on config)
-                boolean withinRadius = isCircle ? (x * x + z * z <= effectiveRadius * effectiveRadius) : true;
+        // Expand search range if messy edge is enabled (can extend up to 2 blocks beyond normal radius)
+        int searchRadius = messyEdge ? effectiveRadius + 2 : effectiveRadius;
 
-                // Apply messy edge effect if enabled
-                if (withinRadius && messyEdge) {
-                    withinRadius = shouldApplyMessyEdge(x, z, radius, isCircle);
+        int vegetationCleared = 0;
+        int columnsProcessed = 0;
+
+        // Iterate through the area
+        for (int x = -searchRadius; x <= searchRadius; x++) {
+            for (int z = -searchRadius; z <= searchRadius; z++) {
+                boolean withinRadius;
+
+                if (messyEdge) {
+                    // Use messy edge logic for all blocks in expanded range
+                    withinRadius = TerrainUtils.shouldApplyMessyEdge(x, z, radius, isCircle, center);
+                } else {
+                    // Standard circle or square check
+                    withinRadius = isCircle ? (x * x + z * z <= effectiveRadius * effectiveRadius) : true;
                 }
 
                 if (withinRadius) {
+                    columnsProcessed++;
+
                     // Find the top solid block in this column
                     BlockPos columnPos = center.offset(x, 0, z);
 
                     // Check if this specific column is underwater
-                    BlockPos surfacePos = findSurface(level, columnPos);
+                    BlockPos surfacePos = TerrainUtils.findSurface(level, columnPos);
                     if (surfacePos != null) {
                         boolean isColumnUnderwater = isUnderwater(level, surfacePos);
                         if (isColumnUnderwater) {
@@ -273,7 +284,9 @@ public class NaturalizationStaff extends Item {
                     }
 
                     // Naturalize this column (each column checked independently!)
-                    blocksChanged += naturalizeColumn(level, columnPos, mode, resourcesNeeded, playerPos);
+                    int result = naturalizeColumn(level, columnPos, mode, resourcesNeeded, playerPos);
+                    blocksChanged += result;
+                    if (result > 0) vegetationCleared++;
                 }
             }
         }
@@ -288,12 +301,12 @@ public class NaturalizationStaff extends Item {
             typeMessage = "Land";
         }
 
-        LOGGER.info("{} naturalization complete! Changed {} blocks", typeMessage, blocksChanged);
+        LOGGER.info("{} naturalization complete! Changed {} blocks | {} columns | searchRadius={}", typeMessage, blocksChanged, columnsProcessed, searchRadius);
 
-        // Show message to player
+        // Show message to player with debug info
         if (player != null) {
             player.displayClientMessage(
-                Component.literal(typeMessage + " naturalization: " + blocksChanged + " blocks changed"),
+                Component.literal(typeMessage + " naturalization: " + blocksChanged + " blocks | " + columnsProcessed + " columns | R:" + searchRadius),
                 true
             );
         }
@@ -305,7 +318,7 @@ public class NaturalizationStaff extends Item {
         int changed = 0;
 
         // Find the surface level (topmost solid block)
-        BlockPos surfacePos = findSurface(level, pos);
+        BlockPos surfacePos = TerrainUtils.findSurface(level, pos);
 
         if (surfacePos == null) {
             return 0; // No solid blocks found
@@ -335,11 +348,11 @@ public class NaturalizationStaff extends Item {
                 continue;
             }
 
-            if (i > 0) {
-                // ABOVE surface: Clear all vegetation (grass, flowers, saplings, kelp, seagrass, etc.)
-                // Check if it's a plant-type block (extends BushBlock) or is replaceable
+            if (i >= 0) {
+                // AT or ABOVE surface: Check for vegetation first before checking terrain
                 boolean isVegetation = currentState.canBeReplaced() ||
                                       currentState.getBlock() instanceof net.minecraft.world.level.block.BushBlock ||
+                                      currentState.getBlock() instanceof net.minecraft.world.level.block.DoublePlantBlock ||
                                       currentState.getBlock() instanceof net.minecraft.world.level.block.SaplingBlock ||
                                       currentState.is(Blocks.KELP) ||
                                       currentState.is(Blocks.KELP_PLANT) ||
@@ -349,9 +362,34 @@ public class NaturalizationStaff extends Item {
                 if (isVegetation) {
                     LOGGER.info("PASS1: Clearing vegetation at i={}, block={}", i, currentState.getBlock());
                     level.setBlock(targetPos, Blocks.AIR.defaultBlockState(), 2);
+
+                    // For double-height plants (tall grass, large fern, etc.), clear BOTH halves
+                    if (currentState.getBlock() instanceof net.minecraft.world.level.block.DoublePlantBlock) {
+                        // Clear the block above (upper half)
+                        BlockPos abovePos = targetPos.above();
+                        BlockState aboveState = level.getBlockState(abovePos);
+                        if (aboveState.getBlock() instanceof net.minecraft.world.level.block.DoublePlantBlock) {
+                            LOGGER.info("PASS1: Clearing upper half of double plant at {}", abovePos);
+                            level.setBlock(abovePos, Blocks.AIR.defaultBlockState(), 2);
+                        }
+
+                        // Clear the block below (lower half) - in case we encountered the upper half first
+                        BlockPos belowPos = targetPos.below();
+                        BlockState belowState = level.getBlockState(belowPos);
+                        if (belowState.getBlock() instanceof net.minecraft.world.level.block.DoublePlantBlock) {
+                            LOGGER.info("PASS1: Clearing lower half of double plant at {}", belowPos);
+                            level.setBlock(belowPos, Blocks.AIR.defaultBlockState(), 2);
+                        }
+                    }
+                } else if (i == 0) {
+                    // AT surface (i=0): Also clear terrain if it's in safe blocks list
+                    if (NaturalizationConfig.getSafeBlocks().contains(currentState.getBlock())) {
+                        LOGGER.info("PASS1: Clearing safe block at surface i={}, block={}", i, currentState.getBlock());
+                        level.setBlock(targetPos, Blocks.AIR.defaultBlockState(), 2);
+                    }
                 }
             } else {
-                // AT or BELOW surface: Only clear safe terrain blocks
+                // BELOW surface (i < 0): Only clear safe terrain blocks
                 if (NaturalizationConfig.getSafeBlocks().contains(currentState.getBlock())) {
                     LOGGER.info("PASS1: Clearing safe block at i={}, block={}", i, currentState.getBlock());
                     level.setBlock(targetPos, Blocks.AIR.defaultBlockState(), 2);
@@ -601,59 +639,6 @@ public class NaturalizationStaff extends Item {
         // Check if the block above the surface is water
         BlockState above = level.getBlockState(surface.above());
         return above.is(Blocks.WATER);
-    }
-
-    private BlockPos findSurface(Level level, BlockPos start) {
-        // Search upward first to handle being underground
-        for (int y = 0; y < HEIGHT_ABOVE + 10; y++) {
-            BlockPos checkPos = start.offset(0, y, 0);
-            BlockState current = level.getBlockState(checkPos);
-
-            // Found surface: block in safe list (replaceable terrain like dirt, grass, stone)
-            // This skips trees, vegetation, and other non-terrain blocks
-            if (NaturalizationConfig.getSafeBlocks().contains(current.getBlock())) {
-                return checkPos;
-            }
-        }
-
-        // If not found above, search downward
-        for (int y = 0; y > -HEIGHT_BELOW - 10; y--) {
-            BlockPos checkPos = start.offset(0, y, 0);
-            BlockState current = level.getBlockState(checkPos);
-
-            // Found surface: block in safe list (replaceable terrain)
-            if (NaturalizationConfig.getSafeBlocks().contains(current.getBlock())) {
-                return checkPos;
-            }
-        }
-
-        // Return null if no surface found - caller will skip this column
-        return null;
-    }
-
-    private boolean shouldApplyMessyEdge(int x, int z, int radius, boolean isCircle) {
-        // effectiveRadius calculation: radius 1 = 0, radius 2 = 1, etc.
-        int effectiveRadius = radius - 1;
-
-        // Calculate distance from center
-        double distance = isCircle ? Math.sqrt(x * x + z * z) : Math.max(Math.abs(x), Math.abs(z));
-        double edgeDistance = effectiveRadius - distance;
-
-        // If we're more than 2 blocks from edge, always include
-        if (edgeDistance > 2) {
-            return true;
-        }
-
-        // If we're exactly at or beyond effective radius, randomly extend by 1-2 blocks
-        if (edgeDistance <= 0) {
-            int extension = ThreadLocalRandom.current().nextInt(3); // 0, 1, or 2 blocks
-            return distance <= effectiveRadius + extension;
-        }
-
-        // We're within 2 blocks of edge - randomly fade out
-        // Closer to edge = higher chance of being excluded
-        double fadeChance = (2.0 - edgeDistance) / 3.0; // 0% at edge-2, 33% at edge-1, 66% at edge
-        return ThreadLocalRandom.current().nextDouble() > fadeChance;
     }
 
     private BlockState determineNaturalBlock(int relativeY, boolean isUnderwater, NaturalizationMode mode, net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome) {

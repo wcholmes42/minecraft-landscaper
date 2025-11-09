@@ -196,7 +196,8 @@ public class NaturalizationConfig {
         return overworldOnly;
     }
 
-    public static void saveConfig(int newRadius, boolean newConsumeResources, boolean newOverworldOnly) {
+    // Synchronized to prevent concurrent modification and file I/O conflicts
+    public static synchronized void saveConfig(int newRadius, boolean newConsumeResources, boolean newOverworldOnly) {
         radius = Math.max(1, Math.min(50, newRadius));
         consumeResources = newConsumeResources;
         overworldOnly = newOverworldOnly;
@@ -250,17 +251,18 @@ public class NaturalizationConfig {
     }
 
     // Setters for toggleable values (called by keybinds)
-    public static void toggleHighlight() {
+    // Synchronized to prevent race conditions when toggling from multiple threads
+    public static synchronized void toggleHighlight() {
         showHighlight = !showHighlight;
         saveConfig(radius, consumeResources, overworldOnly);
     }
 
-    public static void toggleMessyEdge() {
+    public static synchronized void toggleMessyEdge() {
         messyEdge = !messyEdge;
         saveConfig(radius, consumeResources, overworldOnly);
     }
 
-    public static void toggleShape() {
+    public static synchronized void toggleShape() {
         circleShape = !circleShape;
         saveConfig(radius, consumeResources, overworldOnly);
     }
