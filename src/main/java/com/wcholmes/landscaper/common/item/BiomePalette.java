@@ -1,4 +1,4 @@
-package com.wcholmes.landscaper.item;
+package com.wcholmes.landscaper.common.item;
 
 import net.minecraft.core.Holder;
 import net.minecraft.world.level.biome.Biome;

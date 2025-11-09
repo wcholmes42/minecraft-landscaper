@@ -1,9 +1,9 @@
 package com.wcholmes.landscaper;
 
 import com.mojang.logging.LogUtils;
-import com.wcholmes.landscaper.config.NaturalizationConfig;
-import com.wcholmes.landscaper.item.NaturalizationStaff;
-import com.wcholmes.landscaper.network.ModPackets;
+import com.wcholmes.landscaper.common.config.NaturalizationConfig;
+import com.wcholmes.landscaper.common.item.NaturalizationStaff;
+import com.wcholmes.landscaper.common.network.ModPackets;
 import net.minecraft.world.item.Item;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
@@ -29,9 +29,9 @@ public class Landscaper
 
     public Landscaper()
     {
-        LOGGER.info("=== Landscaper constructor starting ===");
-        LOGGER.info("NATURALIZATION_STAFF defined: {}", NATURALIZATION_STAFF != null);
-        LOGGER.info("NATURALIZATION_STAFF.isPresent() in constructor: {}", NATURALIZATION_STAFF.isPresent());
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Landscaper mod initializing (v2.3.0)");
+        }
 
         IEventBus modEventBus = FMLJavaModLoadingContext.get().getModEventBus();
 
@@ -39,30 +39,25 @@ public class Landscaper
         modEventBus.addListener(this::commonSetup);
 
         // Register items
-        LOGGER.info("Calling ITEMS.register(modEventBus)...");
         ITEMS.register(modEventBus);
-        LOGGER.info("ITEMS.register() completed");
-        LOGGER.info("NATURALIZATION_STAFF.isPresent() after ITEMS.register(): {}", NATURALIZATION_STAFF.isPresent());
 
         // Add items to creative tabs
         modEventBus.addListener(this::addCreative);
 
-        LOGGER.info("=== Landscaper constructor complete ===");
+        LOGGER.info("Landscaper mod registered successfully");
     }
 
     private void commonSetup(final FMLCommonSetupEvent event)
     {
-        LOGGER.info("Terrain Naturalization Tools is loading!");
-        LOGGER.info("NATURALIZATION_STAFF.isPresent() in commonSetup: {}", NATURALIZATION_STAFF.isPresent());
+        LOGGER.info("Landscaper mod loading...");
 
         // Register network packets
-        event.enqueueWork(ModPackets::register);
+        event.enqueueWork(() -> {
+            ModPackets.register();
+            NaturalizationConfig.load();
+        });
 
-        // Load configuration file
-        NaturalizationConfig.load();
-
-        LOGGER.info("Naturalization Staff ready for terraforming!");
-        LOGGER.info("NATURALIZATION_STAFF.isPresent() at end of commonSetup: {}", NATURALIZATION_STAFF.isPresent());
+        LOGGER.info("Landscaper ready! Naturalization Staff available for terraforming");
     }
 
     private void addCreative(net.minecraftforge.event.BuildCreativeModeTabContentsEvent event)

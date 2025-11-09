@@ -1,12 +1,12 @@
-package com.wcholmes.landscaper.client;
+package com.wcholmes.landscaper.client.renderer;
 
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.wcholmes.landscaper.config.NaturalizationConfig;
-import com.wcholmes.landscaper.item.NaturalizationStaff;
-import com.wcholmes.landscaper.util.TerrainUtils;
+import com.wcholmes.landscaper.common.config.NaturalizationConfig;
+import com.wcholmes.landscaper.common.item.NaturalizationStaff;
+import com.wcholmes.landscaper.common.util.TerrainUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -68,15 +68,15 @@ public class HighlightRenderer {
         // Get config values
         int radius = NaturalizationConfig.getRadius();
         boolean isCircle = NaturalizationConfig.isCircleShape();
-        boolean messyEdge = NaturalizationConfig.isMessyEdge();
+        int messyEdgeExtension = NaturalizationConfig.getMessyEdgeExtension();
 
         // Render the highlight
         renderHighlight(event.getPoseStack(), event.getCamera().getPosition(),
-                       targetPos, radius, isCircle, messyEdge, mc.renderBuffers().bufferSource());
+                       targetPos, radius, isCircle, messyEdgeExtension, mc.renderBuffers().bufferSource());
     }
 
     private static void renderHighlight(PoseStack poseStack, Vec3 cameraPos,
-                                        BlockPos center, int radius, boolean isCircle, boolean messyEdge,
+                                        BlockPos center, int radius, boolean isCircle, int messyEdgeExtension,
                                         MultiBufferSource.BufferSource bufferSource) {
         poseStack.pushPose();
 
@@ -99,16 +99,16 @@ public class HighlightRenderer {
         // Iterate through the area and show all affected blocks
         int effectiveRadius = radius - 1; // radius 1 = 0 range, radius 2 = 1 range, etc.
 
-        // Expand search range if messy edge is enabled (can extend up to 2 blocks beyond normal radius)
-        int searchRadius = messyEdge ? effectiveRadius + 2 : effectiveRadius;
+        // Expand search range if messy edge is enabled
+        int searchRadius = messyEdgeExtension > 0 ? effectiveRadius + messyEdgeExtension : effectiveRadius;
 
         for (int x = -searchRadius; x <= searchRadius; x++) {
             for (int z = -searchRadius; z <= searchRadius; z++) {
                 boolean withinRadius;
 
-                if (messyEdge) {
+                if (messyEdgeExtension > 0) {
                     // Use messy edge logic for all blocks in expanded range
-                    withinRadius = TerrainUtils.shouldApplyMessyEdge(x, z, radius, isCircle, center);
+                    withinRadius = TerrainUtils.shouldApplyMessyEdge(x, z, radius, isCircle, center, messyEdgeExtension);
                 } else {
                     // Standard circle or square check
                     withinRadius = isCircle ? (x * x + z * z <= effectiveRadius * effectiveRadius) : true;

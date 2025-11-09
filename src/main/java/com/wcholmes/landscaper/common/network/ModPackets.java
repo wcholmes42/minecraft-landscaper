@@ -1,4 +1,4 @@
-package com.wcholmes.landscaper.network;
+package com.wcholmes.landscaper.common.network;
 
 import com.wcholmes.landscaper.Landscaper;
 import net.minecraft.resources.ResourceLocation;
@@ -23,6 +23,14 @@ public class ModPackets {
             CycleModePacket::encode,
             CycleModePacket::decode,
             CycleModePacket::handle
+        );
+
+        CHANNEL.registerMessage(
+            packetId++,
+            ConfigSyncPacket.class,
+            ConfigSyncPacket::encode,
+            ConfigSyncPacket::new,
+            ConfigSyncPacket::handle
         );
     }
 }

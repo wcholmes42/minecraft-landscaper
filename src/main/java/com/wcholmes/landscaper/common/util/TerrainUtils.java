@@ -1,6 +1,6 @@
-package com.wcholmes.landscaper.util;
+package com.wcholmes.landscaper.common.util;
 
-import com.wcholmes.landscaper.config.NaturalizationConfig;
+import com.wcholmes.landscaper.common.config.NaturalizationConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -69,9 +69,10 @@ public class TerrainUtils {
      * @param radius The configured radius
      * @param isCircle Whether to use circle shape (vs square)
      * @param center The center BlockPos (for deterministic randomness)
+     * @param maxExtension Maximum blocks beyond radius (0-3)
      * @return true if this position should be included
      */
-    public static boolean shouldApplyMessyEdge(int x, int z, int radius, boolean isCircle, BlockPos center) {
+    public static boolean shouldApplyMessyEdge(int x, int z, int radius, boolean isCircle, BlockPos center, int maxExtension) {
         // effectiveRadius calculation: radius 1 = 0, radius 2 = 1, etc.
         int effectiveRadius = radius - 1;
 
@@ -90,9 +91,9 @@ public class TerrainUtils {
         long seed = ((long)center.getX() + x) * 31L + ((long)center.getZ() + z) * 37L;
         Random random = new Random(seed);
 
-        // If we're exactly at or beyond effective radius, randomly extend by 1-2 blocks
+        // If we're exactly at or beyond effective radius, randomly extend by 0 to maxExtension blocks
         if (edgeDistance <= 0) {
-            int extension = random.nextInt(MESSY_EDGE_MAX_EXTENSION); // 0, 1, or 2 blocks
+            int extension = maxExtension > 0 ? random.nextInt(maxExtension + 1) : 0;
             return distance <= effectiveRadius + extension;
         }
 

@@ -1,8 +1,8 @@
-package com.wcholmes.landscaper.item;
+package com.wcholmes.landscaper.common.item;
 
 import com.mojang.logging.LogUtils;
-import com.wcholmes.landscaper.config.NaturalizationConfig;
-import com.wcholmes.landscaper.util.TerrainUtils;
+import com.wcholmes.landscaper.common.config.NaturalizationConfig;
+import com.wcholmes.landscaper.common.util.TerrainUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -37,6 +37,8 @@ public class NaturalizationStaff extends Item {
     private static final Map<UUID, Long> lastUseTime = new ConcurrentHashMap<>();
     private static final long COOLDOWN_MS = 1000; // 1 second cooldown
     private static final long COOLDOWN_CLEANUP_THRESHOLD = 300000; // 5 minutes
+    private static long lastCleanupTime = 0;
+    private static final long CLEANUP_INTERVAL = 60000; // Run cleanup every 60 seconds
 
     // Constants for vegetation chances
     private static final double LAND_VEGETATION_CHANCE = 0.075; // 7.5%
@@ -51,6 +53,46 @@ public class NaturalizationStaff extends Item {
     private static final double GRAVEL_CHANCE = 0.08;      // 8% chance for gravel patches
     private static final double PATH_CHANCE = 0.05;        // 5% chance for dirt paths
     private static final double FARMLAND_CHANCE = 0.02;    // 2% chance for farmland
+
+    // Block update flags
+    private static final int BLOCK_UPDATE_FLAG = 2; // No drops, send update to clients
+
+    // Vegetation distribution percentages (WFC-inspired mix)
+    private static final double VEGE_SHORT_GRASS = 0.40;     // 40% short grass
+    private static final double VEGE_TALL_GRASS = 0.65;      // 25% tall grass (cumulative 65%)
+    private static final double VEGE_LARGE_PLANTS = 0.775;   // 12.5% 2-block plants (cumulative 77.5%)
+    private static final double VEGE_FERN = 0.85;            // 7.5% fern (cumulative 85%)
+    private static final double VEGE_COMMON_FLOWER = 0.933;  // 8.3% common flowers (cumulative 93.3%)
+    // Remaining 6.7% = rare flowers
+    private static final int VEGE_MAX_ADJACENT_SAME = 2;     // Reject if 2+ same plants nearby
+
+    // Underwater vegetation
+    private static final double UNDERWATER_SEAGRASS_RATIO = 0.60; // 60% seagrass, 40% kelp
+
+    // Terrain layer distribution - Underwater
+    private static final double UNDERWATER_SURF_SAND = 0.70;        // 70% sand
+    private static final double UNDERWATER_SURF_GRAVEL = 0.85;      // 15% gravel (cumulative)
+    private static final double UNDERWATER_SURF_MUD = 0.95;         // 10% mud (cumulative)
+    // Remaining 5% = coarse dirt
+
+    private static final double UNDERWATER_MID_GRAVEL = 0.60;       // 60% gravel
+    private static final double UNDERWATER_MID_SAND = 0.90;         // 30% sand (cumulative)
+    // Remaining 10% = clay
+
+    private static final double UNDERWATER_DEEP_SAND = 0.50;        // 50% sand
+    private static final double UNDERWATER_DEEP_GRAVEL = 0.80;      // 30% gravel (cumulative)
+    // Remaining 20% = clay
+
+    // Terrain layer depths (relative to surface)
+    private static final int TERRAIN_LAYER_SHALLOW = -3;  // 1-3 blocks below
+    private static final int TERRAIN_LAYER_MID = -6;      // 4-6 blocks below
+    // Below -6 = deep layer
+
+    // Path mode distribution
+    private static final double PATH_MODE_PATH = 0.75;      // 75% dirt path
+    private static final double PATH_MODE_GRAVEL = 0.85;    // 10% gravel (cumulative)
+    private static final double PATH_MODE_GRASS = 0.95;     // 10% grass (cumulative)
+    // Remaining 5% = farmland
 
     public NaturalizationStaff(Properties properties) {
         super(properties);
@@ -96,14 +138,21 @@ public class NaturalizationStaff extends Item {
             return InteractionResult.SUCCESS;
         }
 
+        // Get player-specific settings early (for multiplayer) or use global config (for singleplayer)
+        com.wcholmes.landscaper.common.config.PlayerConfig.PlayerSettings playerSettings = null;
+        if (player != null && level instanceof ServerLevel) {
+            playerSettings = com.wcholmes.landscaper.common.config.PlayerConfig.getPlayerSettings(player.getUUID());
+        }
+
         // Cooldown check to prevent DoS/spam abuse
         if (player != null && !player.isCreative()) {
             UUID playerId = player.getUUID();
             long now = System.currentTimeMillis();
 
-            // Periodic cleanup: remove entries older than 5 minutes (prevents memory leak)
-            if (ThreadLocalRandom.current().nextInt(100) == 0) { // 1% chance per use
+            // Deterministic cleanup: remove entries older than 5 minutes every 60 seconds
+            if ((now - lastCleanupTime) > CLEANUP_INTERVAL) {
                 lastUseTime.entrySet().removeIf(entry -> (now - entry.getValue()) > COOLDOWN_CLEANUP_THRESHOLD);
+                lastCleanupTime = now;
             }
 
             Long lastUse = lastUseTime.get(playerId);
@@ -117,8 +166,9 @@ public class NaturalizationStaff extends Item {
             lastUseTime.put(playerId, now);
         }
 
-        // Check if overworld-only is enabled
-        if (NaturalizationConfig.isOverworldOnly() && !level.dimension().equals(Level.OVERWORLD)) {
+        // Check if overworld-only is enabled (use player-specific setting)
+        boolean overworldOnly = playerSettings != null ? playerSettings.overworldOnly : NaturalizationConfig.isOverworldOnly();
+        if (overworldOnly && !level.dimension().equals(Level.OVERWORLD)) {
             if (player != null) {
                 player.displayClientMessage(
                     Component.literal("The Naturalization Staff only works in the Overworld!"),
@@ -146,15 +196,20 @@ public class NaturalizationStaff extends Item {
         // Get current mode from staff
         NaturalizationMode mode = getMode(context.getItemInHand());
 
-        LOGGER.info("🎯 RIGHT-CLICKED at {}: block={}, blockAbove={}, mode={}",
-            clickedPos, clickedBlock.getBlock(), blockAbove.getBlock(), mode.getDisplayName());
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Staff used at pos={}, block={}, blockAbove={}, mode={}",
+                clickedPos, clickedBlock.getBlock(), blockAbove.getBlock(), mode.getDisplayName());
+        }
+
+        // Use player-specific consumeResources setting
+        boolean consumeResources = playerSettings != null ? playerSettings.consumeResources : NaturalizationConfig.shouldConsumeResources();
 
         // If resource consumption is enabled, pre-calculate what's needed BEFORE placing blocks
-        if (NaturalizationConfig.shouldConsumeResources() && player != null && !player.isCreative()) {
+        if (consumeResources && player != null && !player.isCreative()) {
             Map<Item, Integer> resourcesNeeded = new HashMap<>();
 
             // Dry run to calculate resources (don't place blocks)
-            calculateResourcesNeeded(level, clickedPos, mode, resourcesNeeded);
+            calculateResourcesNeeded(level, clickedPos, mode, resourcesNeeded, playerSettings);
 
             // Check if player has the resources
             Map<Item, Integer> missingResources = getMissingResources(player, resourcesNeeded);
@@ -168,7 +223,7 @@ public class NaturalizationStaff extends Item {
 
             // Player has resources - place blocks
             // Pass empty map to prevent double-tracking
-            boolean success = naturalizeTerrain(level, clickedPos, player, mode, new HashMap<>());
+            boolean success = naturalizeTerrain(level, clickedPos, player, mode, new HashMap<>(), playerSettings);
 
             // Consume only what we originally calculated (not double-counted)
             if (success) {
@@ -179,14 +234,16 @@ public class NaturalizationStaff extends Item {
         } else {
             // No resource consumption - just place blocks
             Map<Item, Integer> resourcesNeeded = new HashMap<>();
-            boolean success = naturalizeTerrain(level, clickedPos, player, mode, resourcesNeeded);
+            boolean success = naturalizeTerrain(level, clickedPos, player, mode, resourcesNeeded, playerSettings);
             return success ? InteractionResult.SUCCESS : InteractionResult.FAIL;
         }
     }
 
-    private void calculateResourcesNeeded(Level level, BlockPos center, NaturalizationMode mode, Map<Item, Integer> resourcesNeeded) {
+    private void calculateResourcesNeeded(Level level, BlockPos center, NaturalizationMode mode, Map<Item, Integer> resourcesNeeded,
+                                          com.wcholmes.landscaper.common.config.PlayerConfig.PlayerSettings playerSettings) {
         // Dry run to calculate what resources would be needed without placing blocks
-        int radius = NaturalizationConfig.getRadius();
+        // Use player-specific radius or fall back to global config
+        int radius = playerSettings != null ? playerSettings.radius : NaturalizationConfig.getRadius();
         int effectiveRadius = radius - 1; // radius 1 = 0 range, radius 2 = 1 range, etc.
 
         for (int dx = -effectiveRadius; dx <= effectiveRadius; dx++) {
@@ -230,25 +287,29 @@ public class NaturalizationStaff extends Item {
         }
     }
 
-    private boolean naturalizeTerrain(Level level, BlockPos center, Player player, NaturalizationMode mode, Map<Item, Integer> resourcesNeeded) {
+    private boolean naturalizeTerrain(Level level, BlockPos center, Player player, NaturalizationMode mode, Map<Item, Integer> resourcesNeeded,
+                                      com.wcholmes.landscaper.common.config.PlayerConfig.PlayerSettings playerSettings) {
         int blocksChanged = 0;
         int landColumns = 0;
         int underwaterColumns = 0;
 
-        // Get radius from config
-        int radius = NaturalizationConfig.getRadius();
+        // Use player-specific settings or fall back to global config
+        int radius = playerSettings != null ? playerSettings.radius : NaturalizationConfig.getRadius();
         int effectiveRadius = radius - 1; // radius 1 = 0 range, radius 2 = 1 range, etc.
 
         // Get player position for safety checks (prevent falling through world)
         BlockPos playerPos = player != null ? player.blockPosition() : null;
 
         boolean isCircle = NaturalizationConfig.isCircleShape();
-        boolean messyEdge = NaturalizationConfig.isMessyEdge();
-        LOGGER.info("Starting {} naturalization at {} with radius {}, shape={}, messyEdge={}",
-            mode.getDisplayName(), center, radius, isCircle ? "circle" : "square", messyEdge);
+        int messyEdgeExtension = playerSettings != null ? playerSettings.messyEdgeExtension : NaturalizationConfig.getMessyEdgeExtension();
 
-        // Expand search range if messy edge is enabled (can extend up to 2 blocks beyond normal radius)
-        int searchRadius = messyEdge ? effectiveRadius + 2 : effectiveRadius;
+        if (LOGGER.isDebugEnabled()) {
+            LOGGER.debug("Starting {} naturalization at {} with radius {}, shape={}, messyEdgeExtension={}",
+                mode.getDisplayName(), center, radius, isCircle ? "circle" : "square", messyEdgeExtension);
+        }
+
+        // Expand search range if messy edge is enabled
+        int searchRadius = messyEdgeExtension > 0 ? effectiveRadius + messyEdgeExtension : effectiveRadius;
 
         int vegetationCleared = 0;
         int columnsProcessed = 0;
@@ -258,9 +319,9 @@ public class NaturalizationStaff extends Item {
             for (int z = -searchRadius; z <= searchRadius; z++) {
                 boolean withinRadius;
 
-                if (messyEdge) {
+                if (messyEdgeExtension > 0) {
                     // Use messy edge logic for all blocks in expanded range
-                    withinRadius = TerrainUtils.shouldApplyMessyEdge(x, z, radius, isCircle, center);
+                    withinRadius = TerrainUtils.shouldApplyMessyEdge(x, z, radius, isCircle, center, messyEdgeExtension);
                 } else {
                     // Standard circle or square check
                     withinRadius = isCircle ? (x * x + z * z <= effectiveRadius * effectiveRadius) : true;
@@ -284,7 +345,7 @@ public class NaturalizationStaff extends Item {
                     }
 
                     // Naturalize this column (each column checked independently!)
-                    int result = naturalizeColumn(level, columnPos, mode, resourcesNeeded, playerPos);
+                    int result = naturalizeColumn(level, columnPos, mode, resourcesNeeded, playerPos, playerSettings);
                     blocksChanged += result;
                     if (result > 0) vegetationCleared++;
                 }
@@ -314,7 +375,8 @@ public class NaturalizationStaff extends Item {
         return blocksChanged > 0;
     }
 
-    private int naturalizeColumn(Level level, BlockPos pos, NaturalizationMode mode, Map<Item, Integer> resourcesNeeded, BlockPos playerPos) {
+    private int naturalizeColumn(Level level, BlockPos pos, NaturalizationMode mode, Map<Item, Integer> resourcesNeeded, BlockPos playerPos,
+                                 com.wcholmes.landscaper.common.config.PlayerConfig.PlayerSettings playerSettings) {
         int changed = 0;
 
         // Find the surface level (topmost solid block)
@@ -326,7 +388,9 @@ public class NaturalizationStaff extends Item {
 
         // Safety check: Don't modify columns directly under the player (prevent falling)
         if (playerPos != null && pos.getX() == playerPos.getX() && pos.getZ() == playerPos.getZ()) {
-            LOGGER.info("Skipping column at {} - player is standing here!", pos);
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("Skipping column at {} - player is standing here", pos);
+            }
             return 0;
         }
 
@@ -336,7 +400,7 @@ public class NaturalizationStaff extends Item {
         // Check if this is an underwater environment
         boolean isUnderwater = isUnderwater(level, surfacePos);
 
-        LOGGER.info("Column at {}: isUnderwater={}", surfacePos, isUnderwater);
+        // Column processing (logged at DEBUG level only to avoid spam)
 
         // PASS 1: Clear blocks to AIR (destroys vegetation above, terrain at/below surface)
         for (int i = HEIGHT_ABOVE; i >= -HEIGHT_BELOW; i--) {
@@ -360,8 +424,7 @@ public class NaturalizationStaff extends Item {
                                       currentState.is(Blocks.TALL_SEAGRASS);
 
                 if (isVegetation) {
-                    LOGGER.info("PASS1: Clearing vegetation at i={}, block={}", i, currentState.getBlock());
-                    level.setBlock(targetPos, Blocks.AIR.defaultBlockState(), 2);
+                    level.setBlock(targetPos, Blocks.AIR.defaultBlockState(), BLOCK_UPDATE_FLAG);
 
                     // For double-height plants (tall grass, large fern, etc.), clear BOTH halves
                     if (currentState.getBlock() instanceof net.minecraft.world.level.block.DoublePlantBlock) {
@@ -369,30 +432,26 @@ public class NaturalizationStaff extends Item {
                         BlockPos abovePos = targetPos.above();
                         BlockState aboveState = level.getBlockState(abovePos);
                         if (aboveState.getBlock() instanceof net.minecraft.world.level.block.DoublePlantBlock) {
-                            LOGGER.info("PASS1: Clearing upper half of double plant at {}", abovePos);
-                            level.setBlock(abovePos, Blocks.AIR.defaultBlockState(), 2);
+                            level.setBlock(abovePos, Blocks.AIR.defaultBlockState(), BLOCK_UPDATE_FLAG);
                         }
 
                         // Clear the block below (lower half) - in case we encountered the upper half first
                         BlockPos belowPos = targetPos.below();
                         BlockState belowState = level.getBlockState(belowPos);
                         if (belowState.getBlock() instanceof net.minecraft.world.level.block.DoublePlantBlock) {
-                            LOGGER.info("PASS1: Clearing lower half of double plant at {}", belowPos);
-                            level.setBlock(belowPos, Blocks.AIR.defaultBlockState(), 2);
+                            level.setBlock(belowPos, Blocks.AIR.defaultBlockState(), BLOCK_UPDATE_FLAG);
                         }
                     }
                 } else if (i == 0) {
                     // AT surface (i=0): Also clear terrain if it's in safe blocks list
                     if (NaturalizationConfig.getSafeBlocks().contains(currentState.getBlock())) {
-                        LOGGER.info("PASS1: Clearing safe block at surface i={}, block={}", i, currentState.getBlock());
-                        level.setBlock(targetPos, Blocks.AIR.defaultBlockState(), 2);
+                        level.setBlock(targetPos, Blocks.AIR.defaultBlockState(), BLOCK_UPDATE_FLAG);
                     }
                 }
             } else {
                 // BELOW surface (i < 0): Only clear safe terrain blocks
                 if (NaturalizationConfig.getSafeBlocks().contains(currentState.getBlock())) {
-                    LOGGER.info("PASS1: Clearing safe block at i={}, block={}", i, currentState.getBlock());
-                    level.setBlock(targetPos, Blocks.AIR.defaultBlockState(), 2);
+                    level.setBlock(targetPos, Blocks.AIR.defaultBlockState(), BLOCK_UPDATE_FLAG);
                 }
             }
         }
@@ -414,14 +473,12 @@ public class NaturalizationStaff extends Item {
             // }
 
             // Place the block (flag 2 = no drops)
-            if (i == 0) {
-                LOGGER.info("PASS2: Placing {} at surface (i=0), isUnderwater={}", newState.getBlock(), isUnderwater);
-            }
-            level.setBlock(targetPos, newState, 2);
+            level.setBlock(targetPos, newState, BLOCK_UPDATE_FLAG);
             changed++;
 
-            // Track resources needed for this block
-            if (NaturalizationConfig.shouldConsumeResources()) {
+            // Track resources needed for this block (use player-specific setting)
+            boolean consumeResources = playerSettings != null ? playerSettings.consumeResources : NaturalizationConfig.shouldConsumeResources();
+            if (consumeResources) {
                 Item resourceItem = getResourceItemForBlock(newState);
                 if (resourceItem != null) {
                     resourcesNeeded.merge(resourceItem, 1, Integer::sum);
@@ -436,8 +493,10 @@ public class NaturalizationStaff extends Item {
                     // Add plants mode - Biome-specific WFC-inspired vegetation
                     if (!isUnderwater && (surfaceState.is(Blocks.GRASS_BLOCK) || surfaceState.is(Blocks.SAND) ||
                         surfaceState.is(Blocks.PODZOL) || surfaceState.is(Blocks.MYCELIUM) || surfaceState.is(Blocks.MUD))) {
-                        // 7.5% chance to attempt placing vegetation
-                        if (ThreadLocalRandom.current().nextDouble() < LAND_VEGETATION_CHANCE) {
+                        // Use player-specific vegetation density
+                        NaturalizationConfig.VegetationDensity density = playerSettings != null ?
+                            playerSettings.vegetationDensity : NaturalizationConfig.getVegetationDensity();
+                        if (ThreadLocalRandom.current().nextDouble() < density.getChance()) {
                             BlockPos abovePos = targetPos.above();
                             // Only place if air above
                             if (level.getBlockState(abovePos).isAir()) {
@@ -446,23 +505,28 @@ public class NaturalizationStaff extends Item {
                                 BlockState plantState = plantBlock.defaultBlockState();
                                 // WFC check: ensure aesthetic variety (no identical neighbors)
                                 if (shouldPlaceVegetation(level, abovePos, plantState)) {
-                                    level.setBlock(abovePos, plantState, 2);
+                                    level.setBlock(abovePos, plantState, BLOCK_UPDATE_FLAG);
                                 }
                             }
                         }
                     } else if (isUnderwater && (surfaceState.is(Blocks.SAND) || surfaceState.is(Blocks.GRAVEL) ||
                                                 surfaceState.is(Blocks.MUD) || surfaceState.is(Blocks.CLAY))) {
                         // Underwater shoreline vegetation: kelp and seagrass
-                        // Messy modes get 3x more vegetation (22.5% vs 7.5%)
-                        double vegetationChance = mode.allowsVariation() ? 0.225 : 0.075;
+                        // Messy modes get 3x more vegetation
+                        NaturalizationConfig.VegetationDensity density = playerSettings != null ?
+                            playerSettings.vegetationDensity : NaturalizationConfig.getVegetationDensity();
+                        double baseChance = density.getChance();
+                        double vegetationChance = mode.allowsVariation() ?
+                            baseChance * MESSY_UNDERWATER_VEGETATION_MULTIPLIER :
+                            baseChance;
                         if (ThreadLocalRandom.current().nextDouble() < vegetationChance) {
                             BlockPos abovePos = targetPos.above();
                             BlockState aboveState = level.getBlockState(abovePos);
                             // Only place if water above
                             if (aboveState.is(Blocks.WATER)) {
                                 // 60% seagrass, 40% kelp
-                                Block plantBlock = ThreadLocalRandom.current().nextDouble() < 0.60 ? Blocks.SEAGRASS : Blocks.KELP;
-                                level.setBlock(abovePos, plantBlock.defaultBlockState(), 2);
+                                Block plantBlock = ThreadLocalRandom.current().nextDouble() < UNDERWATER_SEAGRASS_RATIO ? Blocks.SEAGRASS : Blocks.KELP;
+                                level.setBlock(abovePos, plantBlock.defaultBlockState(), BLOCK_UPDATE_FLAG);
                             }
                         }
                     }
@@ -472,7 +536,7 @@ public class NaturalizationStaff extends Item {
 
         // PASS 3: Clean up item drops in the area
         if (!level.isClientSide()) {
-            int cleanupRadius = NaturalizationConfig.getRadius();
+            int cleanupRadius = playerSettings != null ? playerSettings.radius : NaturalizationConfig.getRadius();
             BlockPos center = surfacePos;
             level.getEntitiesOfClass(net.minecraft.world.entity.item.ItemEntity.class,
                 new net.minecraft.world.phys.AABB(center).inflate(cleanupRadius),
@@ -483,47 +547,6 @@ public class NaturalizationStaff extends Item {
         return changed;
     }
 
-    private BlockState getRandomVegetation() {
-        // Weighted vegetation palette for natural aesthetics
-        // Distribution: 40% short grass, 25% tall grass, 12.5% 2-tall plants, 7.5% fern, 5% common flowers, 2.5% rare flowers
-        double roll = ThreadLocalRandom.current().nextDouble();
-
-        // 40% short grass (most common)
-        if (roll < 0.40) {
-            return Blocks.GRASS.defaultBlockState();
-        }
-        // 25% tall grass
-        else if (roll < 0.65) {
-            return Blocks.TALL_GRASS.defaultBlockState();
-        }
-        // 12.5% 2-block tall plants (half of tall grass %)
-        else if (roll < 0.775) {
-            Block[] tallPlants = {Blocks.LARGE_FERN, Blocks.TALL_GRASS};
-            return tallPlants[ThreadLocalRandom.current().nextInt(tallPlants.length)].defaultBlockState();
-        }
-        // 7.5% fern (halved from previous)
-        else if (roll < 0.85) {
-            return Blocks.FERN.defaultBlockState();
-        }
-        // 12.5% flowers total (down from 30%)
-        // 8.3% common flowers
-        else if (roll < 0.933) {
-            Block[] commonFlowers = {Blocks.DANDELION, Blocks.POPPY};
-            return commonFlowers[ThreadLocalRandom.current().nextInt(commonFlowers.length)].defaultBlockState();
-        }
-        // 4.2% rare flowers
-        else {
-            Block[] rareFlowers = {
-                Blocks.BLUE_ORCHID,
-                Blocks.ALLIUM,
-                Blocks.AZURE_BLUET,
-                Blocks.OXEYE_DAISY,
-                Blocks.CORNFLOWER,
-                Blocks.LILY_OF_THE_VALLEY
-            };
-            return rareFlowers[ThreadLocalRandom.current().nextInt(rareFlowers.length)].defaultBlockState();
-        }
-    }
 
     private boolean shouldPlaceVegetation(Level level, BlockPos pos, BlockState plantToPlace) {
         // Wave Function Collapse inspired aesthetics:
@@ -546,7 +569,7 @@ public class NaturalizationStaff extends Item {
         }
 
         // Reject if 2+ identical plants nearby (enforces variety)
-        return sameTypeCount < 2;
+        return sameTypeCount < VEGE_MAX_ADJACENT_SAME;
     }
 
     private Item getResourceItemForBlock(BlockState state) {
@@ -651,9 +674,9 @@ public class NaturalizationStaff extends Item {
                 if (mode.allowsVariation()) {
                     double roll = ThreadLocalRandom.current().nextDouble();
                     // 70% sand, 15% gravel, 10% mud, 5% coarse dirt
-                    if (roll < 0.70) return Blocks.SAND.defaultBlockState();
-                    else if (roll < 0.85) return Blocks.GRAVEL.defaultBlockState();
-                    else if (roll < 0.95) return Blocks.MUD.defaultBlockState();
+                    if (roll < UNDERWATER_SURF_SAND) return Blocks.SAND.defaultBlockState();
+                    else if (roll < UNDERWATER_SURF_GRAVEL) return Blocks.GRAVEL.defaultBlockState();
+                    else if (roll < UNDERWATER_SURF_MUD) return Blocks.MUD.defaultBlockState();
                     else return Blocks.COARSE_DIRT.defaultBlockState();
                 } else {
                     return Blocks.SAND.defaultBlockState();
@@ -663,24 +686,24 @@ public class NaturalizationStaff extends Item {
                 if (mode.allowsVariation()) {
                     double roll = ThreadLocalRandom.current().nextDouble();
                     // 60% gravel, 30% sand, 10% clay
-                    if (roll < 0.60) return Blocks.GRAVEL.defaultBlockState();
-                    else if (roll < 0.90) return Blocks.SAND.defaultBlockState();
+                    if (roll < UNDERWATER_MID_GRAVEL) return Blocks.GRAVEL.defaultBlockState();
+                    else if (roll < UNDERWATER_MID_SAND) return Blocks.SAND.defaultBlockState();
                     else return Blocks.CLAY.defaultBlockState();
                 } else {
                     return Blocks.GRAVEL.defaultBlockState();
                 }
-            } else if (relativeY >= -3) {
+            } else if (relativeY >= TERRAIN_LAYER_SHALLOW) {
                 // Mid subsurface - messy mode adds variation
                 if (mode.allowsVariation()) {
                     double roll = ThreadLocalRandom.current().nextDouble();
                     // 50% sand, 30% gravel, 20% clay
-                    if (roll < 0.50) return Blocks.SAND.defaultBlockState();
-                    else if (roll < 0.80) return Blocks.GRAVEL.defaultBlockState();
+                    if (roll < UNDERWATER_DEEP_SAND) return Blocks.SAND.defaultBlockState();
+                    else if (roll < UNDERWATER_DEEP_GRAVEL) return Blocks.GRAVEL.defaultBlockState();
                     else return Blocks.CLAY.defaultBlockState();
                 } else {
                     return Blocks.SAND.defaultBlockState();
                 }
-            } else if (relativeY >= -6) {
+            } else if (relativeY >= TERRAIN_LAYER_MID) {
                 return Blocks.CLAY.defaultBlockState();
             } else {
                 return Blocks.STONE.defaultBlockState();
@@ -694,7 +717,7 @@ public class NaturalizationStaff extends Item {
                 // SURFACE ONLY - use biome-specific palette
                 Block surfaceBlock = BiomePalette.getSurfaceBlock(biome, mode, mode.allowsVariation());
                 return surfaceBlock.defaultBlockState();
-            } else if (relativeY >= -3) {
+            } else if (relativeY >= TERRAIN_LAYER_SHALLOW) {
                 // 1-3 blocks below surface - DIRT
                 return Blocks.DIRT.defaultBlockState();
             } else {
@@ -704,69 +727,5 @@ public class NaturalizationStaff extends Item {
         }
     }
 
-    private BlockState getSurfaceBlock(NaturalizationMode mode) {
-        double roll = ThreadLocalRandom.current().nextDouble();
 
-        switch (mode) {
-            case GRASS_ONLY:
-            case GRASS_WITH_PLANTS:
-                // MODE: Pure grass blocks only
-                // Plants added separately if GRASS_WITH_PLANTS
-                return Blocks.GRASS_BLOCK.defaultBlockState();
-
-            case PATH:
-                // MODE: Pure dirt paths only - great for trails
-                return Blocks.DIRT_PATH.defaultBlockState();
-
-            case MESSY_PATH:
-                // MODE: Mostly paths (75%) with natural variation
-                // 75% Dirt Path, 10% Gravel, 10% Grass, 5% Farmland
-                if (roll < 0.75) {
-                    return Blocks.DIRT_PATH.defaultBlockState();
-                } else if (roll < 0.85) {
-                    return Blocks.GRAVEL.defaultBlockState();
-                } else if (roll < 0.95) {
-                    return Blocks.GRASS_BLOCK.defaultBlockState();
-                } else {
-                    return Blocks.FARMLAND.defaultBlockState();
-                }
-
-            case MESSY:
-            case MESSY_WITH_PLANTS:
-            default:
-                // MODE: Natural variation - realistic terrain
-                // 85% Grass, 8% Gravel, 5% Path, 2% Farmland
-                // Plants added separately if MESSY_WITH_PLANTS
-                if (roll < 0.02) {
-                    // 2% Farmland (super rare)
-                    return Blocks.FARMLAND.defaultBlockState();
-                } else if (roll < 0.07) {
-                    // 5% Dirt Path (rare)
-                    return Blocks.DIRT_PATH.defaultBlockState();
-                } else if (roll < 0.15) {
-                    // 8% Gravel patches (uncommon)
-                    return Blocks.GRAVEL.defaultBlockState();
-                } else {
-                    // 85% Grass (common)
-                    return Blocks.GRASS_BLOCK.defaultBlockState();
-                }
-        }
-    }
-
-    private void addSurfaceDecoration(Level level, BlockPos surfacePos, BlockState surfaceBlock) {
-        // Apply actual Minecraft bonemeal effect
-        if (level instanceof ServerLevel serverLevel) {
-            Block block = surfaceBlock.getBlock();
-
-            // Check if this block can be bonemealed (grass/sand blocks implement BonemealableBlock)
-            if (block instanceof BonemealableBlock bonemealable) {
-                if (bonemealable.isValidBonemealTarget(serverLevel, surfacePos, surfaceBlock, false)) {
-                    if (bonemealable.isBonemealSuccess(serverLevel, serverLevel.random, surfacePos, surfaceBlock)) {
-                        // Apply the bonemeal effect - spawns grass, flowers, kelp, etc!
-                        bonemealable.performBonemeal(serverLevel, serverLevel.random, surfacePos, surfaceBlock);
-                    }
-                }
-            }
-        }
-    }
 }

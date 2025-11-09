@@ -1,12 +1,12 @@
 package com.wcholmes.landscaper.client;
 
 import com.wcholmes.landscaper.Landscaper;
-import com.wcholmes.landscaper.config.ConfigScreen;
-import com.wcholmes.landscaper.config.NaturalizationConfig;
-import com.wcholmes.landscaper.item.NaturalizationMode;
-import com.wcholmes.landscaper.item.NaturalizationStaff;
-import com.wcholmes.landscaper.network.CycleModePacket;
-import com.wcholmes.landscaper.network.ModPackets;
+import com.wcholmes.landscaper.client.config.ConfigScreen;
+import com.wcholmes.landscaper.common.config.NaturalizationConfig;
+import com.wcholmes.landscaper.common.item.NaturalizationMode;
+import com.wcholmes.landscaper.common.item.NaturalizationStaff;
+import com.wcholmes.landscaper.common.network.CycleModePacket;
+import com.wcholmes.landscaper.common.network.ModPackets;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Player;
@@ -73,9 +73,9 @@ public class ClientEventHandler {
             // Handle toggle messy edge
             if (player != null && KeyBindings.toggleMessyEdge.consumeClick()) {
                 NaturalizationConfig.toggleMessyEdge();
-                boolean enabled = NaturalizationConfig.isMessyEdge();
+                int extension = NaturalizationConfig.getMessyEdgeExtension();
                 player.displayClientMessage(
-                    Component.literal(COLOR_LABEL + "Messy Edge: " + COLOR_VALUE + (enabled ? "ON" : "OFF")),
+                    Component.literal(COLOR_LABEL + "Messy Edge: " + COLOR_VALUE + extension + " blocks"),
                     true // Action bar
                 );
             }
