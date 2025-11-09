@@ -19,7 +19,10 @@
       "Bash(ssh root@192.168.68.42:*)",
       "Bash(scp:*)",
       "Bash(./gradlew build:*)",
-      "Bash(md5sum:*)"
+      "Bash(md5sum:*)",
+      "WebSearch",
+      "WebFetch(domain:docs.minecraftforge.net)",
+      "WebFetch(domain:jamieswhiteshirt.github.io)"
     ],
     "deny": [],
     "ask": []

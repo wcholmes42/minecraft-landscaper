@@ -5,7 +5,6 @@ import com.wcholmes.landscaper.common.network.ConfigSyncPacket;
 import com.wcholmes.landscaper.common.network.ModPackets;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
-import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.network.chat.Component;
@@ -50,15 +49,23 @@ public class ConfigScreen extends Screen {
             }
         });
 
-        // Vegetation density cycle button
-        this.addRenderableWidget(CycleButton.<NaturalizationConfig.VegetationDensity>builder(density ->
-                Component.literal(density.getDisplayName()))
-            .withValues(NaturalizationConfig.VegetationDensity.values())
-            .withInitialValue(tempVegetationDensity)
-            .displayOnlyValue()
-            .create(centerX - 150, startY + 30, 300, 20,
-                Component.literal("Vegetation Density"),
-                (button, value) -> tempVegetationDensity = value));
+        // Vegetation density slider (5 levels: 0-4)
+        this.addRenderableWidget(new AbstractSliderButton(centerX - 150, startY + 30, 300, 20,
+            Component.literal("Vegetation: " + tempVegetationDensity.getDisplayName()),
+            tempVegetationDensity.ordinal() / 4.0) {
+            @Override
+            protected void updateMessage() {
+                int level = (int)(this.value * 4);
+                tempVegetationDensity = NaturalizationConfig.VegetationDensity.values()[level];
+                setMessage(Component.literal("Vegetation: " + tempVegetationDensity.getDisplayName()));
+            }
+
+            @Override
+            protected void applyValue() {
+                int level = (int)(this.value * 4);
+                tempVegetationDensity = NaturalizationConfig.VegetationDensity.values()[level];
+            }
+        });
 
         // Messy edge extension slider
         this.addRenderableWidget(new AbstractSliderButton(centerX - 150, startY + 60, 300, 20,
@@ -75,17 +82,37 @@ public class ConfigScreen extends Screen {
             }
         });
 
-        // Consume resources toggle
-        this.addRenderableWidget(CycleButton.onOffBuilder(tempConsumeResources)
-            .create(centerX - 150, startY + 90, 300, 20,
-                Component.literal("Consume Resources"),
-                (button, value) -> tempConsumeResources = value));
+        // Consume resources slider (on/off)
+        this.addRenderableWidget(new AbstractSliderButton(centerX - 150, startY + 90, 300, 20,
+            Component.literal("Consume Resources: " + (tempConsumeResources ? "ON" : "OFF")),
+            tempConsumeResources ? 1.0 : 0.0) {
+            @Override
+            protected void updateMessage() {
+                tempConsumeResources = this.value > 0.5;
+                setMessage(Component.literal("Consume Resources: " + (tempConsumeResources ? "ON" : "OFF")));
+            }
 
-        // Overworld only toggle
-        this.addRenderableWidget(CycleButton.onOffBuilder(tempOverworldOnly)
-            .create(centerX - 150, startY + 120, 300, 20,
-                Component.literal("Overworld Only"),
-                (button, value) -> tempOverworldOnly = value));
+            @Override
+            protected void applyValue() {
+                tempConsumeResources = this.value > 0.5;
+            }
+        });
+
+        // Overworld only slider (on/off)
+        this.addRenderableWidget(new AbstractSliderButton(centerX - 150, startY + 120, 300, 20,
+            Component.literal("Overworld Only: " + (tempOverworldOnly ? "ON" : "OFF")),
+            tempOverworldOnly ? 1.0 : 0.0) {
+            @Override
+            protected void updateMessage() {
+                tempOverworldOnly = this.value > 0.5;
+                setMessage(Component.literal("Overworld Only: " + (tempOverworldOnly ? "ON" : "OFF")));
+            }
+
+            @Override
+            protected void applyValue() {
+                tempOverworldOnly = this.value > 0.5;
+            }
+        });
 
         // Save button
         this.addRenderableWidget(Button.builder(
