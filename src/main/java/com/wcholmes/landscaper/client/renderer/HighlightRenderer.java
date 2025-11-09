@@ -28,10 +28,18 @@ public class HighlightRenderer {
 
     // Rendering constants
     private static final float HIGHLIGHT_Y_OFFSET = 1.01f;  // Just above block surface
-    private static final float HIGHLIGHT_COLOR_R = 1.0f;   // White
-    private static final float HIGHLIGHT_COLOR_G = 1.0f;
-    private static final float HIGHLIGHT_COLOR_B = 1.0f;
-    private static final float HIGHLIGHT_COLOR_A = 1.0f;   // Full opacity for better visibility
+
+    // Inner guaranteed area - bright green
+    private static final float INNER_COLOR_R = 0.0f;
+    private static final float INNER_COLOR_G = 1.0f;
+    private static final float INNER_COLOR_B = 0.0f;
+    private static final float INNER_COLOR_A = 0.8f;
+
+    // Messy edge (possible) - faded yellow
+    private static final float MESSY_COLOR_R = 1.0f;
+    private static final float MESSY_COLOR_G = 1.0f;
+    private static final float MESSY_COLOR_B = 0.0f;
+    private static final float MESSY_COLOR_A = 0.4f;
 
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event) {
@@ -105,13 +113,19 @@ public class HighlightRenderer {
         for (int x = -searchRadius; x <= searchRadius; x++) {
             for (int z = -searchRadius; z <= searchRadius; z++) {
                 boolean withinRadius;
+                boolean isInnerArea = false;  // Track if this is guaranteed inner area
 
                 if (messyEdgeExtension > 0) {
+                    // Check if in guaranteed inner area first
+                    double distance = isCircle ? Math.sqrt(x * x + z * z) : Math.max(Math.abs(x), Math.abs(z));
+                    isInnerArea = distance <= effectiveRadius;
+
                     // Use messy edge logic for all blocks in expanded range
                     withinRadius = TerrainUtils.shouldApplyMessyEdge(x, z, radius, isCircle, center, messyEdgeExtension);
                 } else {
-                    // Standard circle or square check
+                    // Standard circle or square check (all inner area when no messy edge)
                     withinRadius = isCircle ? (x * x + z * z <= effectiveRadius * effectiveRadius) : true;
+                    isInnerArea = withinRadius;
                 }
 
                 if (withinRadius) {
@@ -119,8 +133,14 @@ public class HighlightRenderer {
                     BlockPos surfacePos = TerrainUtils.findSurface(mc.level, pos);
 
                     if (surfacePos != null) {
-                        // Draw outline box around this surface block
-                        drawBlockOutline(matrix, builder, surfacePos, HIGHLIGHT_COLOR_R, HIGHLIGHT_COLOR_G, HIGHLIGHT_COLOR_B, HIGHLIGHT_COLOR_A);
+                        // Use different colors for inner vs messy edge
+                        if (isInnerArea) {
+                            // Bright green - guaranteed area
+                            drawBlockOutline(matrix, builder, surfacePos, INNER_COLOR_R, INNER_COLOR_G, INNER_COLOR_B, INNER_COLOR_A);
+                        } else {
+                            // Faded yellow - possible messy edge
+                            drawBlockOutline(matrix, builder, surfacePos, MESSY_COLOR_R, MESSY_COLOR_G, MESSY_COLOR_B, MESSY_COLOR_A);
+                        }
                     }
                 }
             }
