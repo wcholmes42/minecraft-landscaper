@@ -67,6 +67,26 @@ A Minecraft Forge 1.20.1 mod that provides terrain naturalization tools for easy
    - [ ] No crashes or errors in logs
 
 5. **Release to GitHub**
+
+   **RECOMMENDED: Use Quick Release (one command for everything):**
+   ```bash
+   ./quick-release.sh "Your commit message here" [major|minor|patch]
+   ```
+   This single command does:
+   - ✅ Builds JAR
+   - ✅ Stages all changes
+   - ✅ Commits with your message
+   - ✅ Pushes to GitHub
+   - ✅ Runs release.sh to bump version and trigger CI/CD
+
+   **Examples:**
+   ```bash
+   ./quick-release.sh "Fix flatten mode height calculation" patch
+   ./quick-release.sh "Add cherry grove biome support" minor
+   ./quick-release.sh "Complete terrain system overhaul" major
+   ```
+
+   **OR use manual release workflow:**
    ```bash
    ./release.sh <major|minor|patch>
    ```
