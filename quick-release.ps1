@@ -49,7 +49,7 @@ Write-Host "OK Committed" -ForegroundColor Green
 
 # Step 4: Push
 Write-Host "[4/7] Pushing to GitHub..." -ForegroundColor Yellow
-git push 2>&1 | Out-Null
+git push
 Write-Host "OK Pushed" -ForegroundColor Green
 
 # Step 5: Release
