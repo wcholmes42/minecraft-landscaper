@@ -66,6 +66,11 @@ public class NaturalizationConfig {
     private static volatile boolean circleShape = true; // true = circle, false = square
     private static volatile VegetationDensity vegetationDensity = VegetationDensity.MEDIUM;
 
+    // New settings for advanced modes
+    private static volatile int maxFlattenHeight = 50; // Maximum height difference for flatten mode (1-320)
+    private static volatile int erosionStrength = 3; // Height variation strength for naturalize mode (1-10)
+    private static volatile double roughnessAmount = 1.5; // Roughness multiplier for naturalize mode (0.0-5.0)
+
     public static class ConfigData {
         public List<String> safe_blocks_to_replace;
         public int radius = 5;
@@ -75,6 +80,12 @@ public class NaturalizationConfig {
         public int messy_edge_extension = 2;
         public boolean circle_shape = true;
         public String vegetation_density = "MEDIUM";
+
+        // New settings for advanced modes
+        public int max_flatten_height = 50;
+        public int erosion_strength = 3;
+        public double roughness_amount = 1.5;
+
         public String description = "Configuration for Naturalization Staff behavior";
         public String safe_blocks_description = "List of blocks that can be safely replaced. Use minecraft:block_name format.";
         public String radius_description = "Horizontal radius of effect (1-50 blocks)";
@@ -84,6 +95,9 @@ public class NaturalizationConfig {
         public String messy_edge_extension_description = "Blocks beyond radius for messy edge (0-3, 0=disabled)";
         public String circle_shape_description = "If true, uses circular area. If false, uses square area";
         public String vegetation_density_description = "Vegetation density: NONE, LOW (2.5%), MEDIUM (7.5%), HIGH (15%), VERY_HIGH (30%)";
+        public String max_flatten_height_description = "Max height difference for flatten mode to check/modify (1-320 blocks)";
+        public String erosion_strength_description = "Height variation strength for naturalize mode (1-10 blocks)";
+        public String roughness_amount_description = "Roughness/weathering multiplier for naturalize mode (0.0-5.0)";
 
         public ConfigData() {}
 
@@ -173,6 +187,11 @@ public class NaturalizationConfig {
                 vegetationDensity = VegetationDensity.MEDIUM;
             }
 
+            // Load new advanced settings
+            maxFlattenHeight = Math.max(1, Math.min(320, config.max_flatten_height)); // Clamp to 1-320
+            erosionStrength = Math.max(1, Math.min(10, config.erosion_strength)); // Clamp to 1-10
+            roughnessAmount = Math.max(0.0, Math.min(5.0, config.roughness_amount)); // Clamp to 0.0-5.0
+
             // Convert string IDs to blocks
             safeBlocks = new HashSet<>();
             for (String blockId : config.safe_blocks_to_replace) {
@@ -250,6 +269,9 @@ public class NaturalizationConfig {
             config.messy_edge_extension = messyEdgeExtension;
             config.circle_shape = circleShape;
             config.vegetation_density = vegetationDensity.name();
+            config.max_flatten_height = maxFlattenHeight;
+            config.erosion_strength = erosionStrength;
+            config.roughness_amount = roughnessAmount;
 
             // Write back to file
             String updatedJson = GSON.toJson(config);
@@ -310,6 +332,35 @@ public class NaturalizationConfig {
 
     public static synchronized void toggleShape() {
         circleShape = !circleShape;
+        saveConfig(radius, consumeResources, overworldOnly);
+    }
+
+    // Getters for new advanced settings
+    public static int getMaxFlattenHeight() {
+        return maxFlattenHeight;
+    }
+
+    public static int getErosionStrength() {
+        return erosionStrength;
+    }
+
+    public static double getRoughnessAmount() {
+        return roughnessAmount;
+    }
+
+    // Setters for new advanced settings
+    public static synchronized void setMaxFlattenHeight(int height) {
+        maxFlattenHeight = Math.max(1, Math.min(320, height));
+        saveConfig(radius, consumeResources, overworldOnly);
+    }
+
+    public static synchronized void setErosionStrength(int strength) {
+        erosionStrength = Math.max(1, Math.min(10, strength));
+        saveConfig(radius, consumeResources, overworldOnly);
+    }
+
+    public static synchronized void setRoughnessAmount(double amount) {
+        roughnessAmount = Math.max(0.0, Math.min(5.0, amount));
         saveConfig(radius, consumeResources, overworldOnly);
     }
 }

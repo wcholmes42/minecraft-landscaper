@@ -16,15 +16,22 @@ public class ConfigSyncPacket {
     private final boolean overworldOnly;
     private final String vegetationDensity;
     private final int messyEdgeExtension;
+    private final int maxFlattenHeight;
+    private final int erosionStrength;
+    private final double roughnessAmount;
 
     public ConfigSyncPacket(int radius, boolean consumeResources, boolean overworldOnly,
                            NaturalizationConfig.VegetationDensity vegetationDensity,
-                           int messyEdgeExtension) {
+                           int messyEdgeExtension, int maxFlattenHeight,
+                           int erosionStrength, double roughnessAmount) {
         this.radius = radius;
         this.consumeResources = consumeResources;
         this.overworldOnly = overworldOnly;
         this.vegetationDensity = vegetationDensity.name();
         this.messyEdgeExtension = messyEdgeExtension;
+        this.maxFlattenHeight = maxFlattenHeight;
+        this.erosionStrength = erosionStrength;
+        this.roughnessAmount = roughnessAmount;
     }
 
     public ConfigSyncPacket(FriendlyByteBuf buf) {
@@ -33,6 +40,9 @@ public class ConfigSyncPacket {
         this.overworldOnly = buf.readBoolean();
         this.vegetationDensity = buf.readUtf();
         this.messyEdgeExtension = buf.readInt();
+        this.maxFlattenHeight = buf.readInt();
+        this.erosionStrength = buf.readInt();
+        this.roughnessAmount = buf.readDouble();
     }
 
     public void encode(FriendlyByteBuf buf) {
@@ -41,6 +51,9 @@ public class ConfigSyncPacket {
         buf.writeBoolean(overworldOnly);
         buf.writeUtf(vegetationDensity);
         buf.writeInt(messyEdgeExtension);
+        buf.writeInt(maxFlattenHeight);
+        buf.writeInt(erosionStrength);
+        buf.writeDouble(roughnessAmount);
     }
 
     public void handle(Supplier<NetworkEvent.Context> contextSupplier) {
@@ -59,7 +72,10 @@ public class ConfigSyncPacket {
                         density,
                         messyEdgeExtension,
                         consumeResources,
-                        overworldOnly
+                        overworldOnly,
+                        maxFlattenHeight,
+                        erosionStrength,
+                        roughnessAmount
                     );
 
                     // Log the sync

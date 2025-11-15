@@ -28,3 +28,4 @@ forge*changelog.txt
 # Texture generation scripts (temporary)
 create_textures.py
 create_staff_texture.py
+logs/

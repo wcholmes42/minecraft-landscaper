@@ -3,7 +3,7 @@
 A Minecraft Forge 1.20.1 mod that provides terrain naturalization tools for easy landscape editing.
 
 **Repository:** https://github.com/wcholmes42/minecraft-landscaper
-**Current Version:** 2.2.3
+**Current Version:** 2.3.0 (MAJOR UPDATE - 4 New Terrain Modes!)
 
 ---
 
@@ -54,7 +54,11 @@ A Minecraft Forge 1.20.1 mod that provides terrain naturalization tools for easy
    - Restart Minecraft client to load new JAR
 
 4. **Test Checklist**
-   - [ ] All 6 modes work correctly
+   - [ ] All 10 modes work correctly (6 replace + FILL + FLATTEN + FLOOD + NATURALIZE)
+   - [ ] FILL mode fills air gaps within terrain
+   - [ ] FLATTEN mode levels terrain to clicked height
+   - [ ] FLOOD mode fills area with water
+   - [ ] NATURALIZE mode creates organic erosion patterns
    - [ ] Highlight matches actual affected blocks (messy edge randomization)
    - [ ] All keybindings work (V, K, H, M, C)
    - [ ] Multiplayer synchronization (mode changes visible to all players)
@@ -88,17 +92,31 @@ com.wcholmes.landscaper/
 ├── KeyBindings.java             # [MISPLACED - should be in client/]
 ├── client/
 │   ├── ClientEventHandler.java # Client-side event handling
-│   └── HighlightRenderer.java  # Block highlight rendering
-├── config/
-│   ├── NaturalizationConfig.java  # JSON config management
-│   └── ConfigScreen.java          # In-game GUI settings
-├── item/
-│   ├── NaturalizationStaff.java   # Core item logic (787 lines)
-│   ├── NaturalizationMode.java    # Mode enum (6 modes)
-│   └── BiomePalette.java          # Biome-specific block selection
-└── network/
-    ├── ModPackets.java            # Network channel registration
-    └── CycleModePacket.java       # Client-server mode sync
+│   ├── HighlightRenderer.java  # Block highlight rendering
+│   └── config/
+│       └── ConfigScreen.java    # In-game GUI settings (8 sliders)
+├── common/
+│   ├── config/
+│   │   ├── NaturalizationConfig.java  # JSON config management
+│   │   └── PlayerConfig.java          # Per-player multiplayer settings
+│   ├── item/
+│   │   ├── NaturalizationStaff.java   # Core item (352 lines - refactored!)
+│   │   ├── NaturalizationMode.java    # Mode enum (10 modes)
+│   │   └── BiomePalette.java          # Biome-specific block selection
+│   ├── strategy/                       # NEW: Strategy pattern architecture
+│   │   ├── TerrainModificationStrategy.java  # Strategy interface
+│   │   ├── BaseTerrainStrategy.java          # Shared utility base class
+│   │   ├── ReplaceStrategy.java              # Original replace-only logic
+│   │   ├── FillStrategy.java                 # NEW: Fills air gaps
+│   │   ├── FlattenStrategy.java              # NEW: Levels terrain
+│   │   ├── FloodStrategy.java                # NEW: Water filling
+│   │   └── NaturalizeStrategy.java           # NEW: Erosion/organic variation
+│   ├── network/
+│   │   ├── ModPackets.java            # Network channel registration
+│   │   ├── CycleModePacket.java       # Client-server mode sync
+│   │   └── ConfigSyncPacket.java      # Config synchronization
+│   └── util/
+│       └── TerrainUtils.java          # Surface detection, messy edge logic
 ```
 
 ### Key Classes
@@ -110,20 +128,29 @@ com.wcholmes.landscaper/
 - Loads config via `NaturalizationConfig.load()`
 - Adds items to creative tabs dynamically
 
-**NaturalizationStaff.java** - Core terrain modification logic (787 lines)
+**NaturalizationStaff.java** - Core item logic (352 lines - 53% reduction via refactoring!)
 - Extends `Item`
-- Implements 3-pass terrain modification system
+- Delegates to strategy pattern for terrain modification
 - Handles resource consumption (optional)
 - DoS protection: 1-second cooldown per player
-- Biome detection and palette selection
-- Wave Function Collapse-inspired vegetation placement
-- Surface finding algorithm (searches up/down for safe blocks)
 - Circle/square shape support with optional messy edges
+- Uses strategy pattern for clean architecture
 
 **NaturalizationMode.java** - Mode management
-- Enum: GRASS_ONLY, GRASS_WITH_PLANTS, MESSY, MESSY_WITH_PLANTS, PATH, MESSY_PATH
-- Flags: `allowVariation`, `addPlants`, `pathOnly`
+- Enum with 10 modes:
+  - **Original 6:** GRASS_ONLY, GRASS_WITH_PLANTS, MESSY, MESSY_WITH_PLANTS, PATH, MESSY_PATH
+  - **NEW:** FILL, FLATTEN, FLOOD, NATURALIZE
+- Flags: `allowVariation`, `addPlants`, `pathOnly`, `strategyType`
 - Navigation: `next()` and `previous()` methods
+
+**Strategy Classes** - NEW: Professional architecture refactoring
+- **TerrainModificationStrategy:** Interface for all strategies
+- **BaseTerrainStrategy:** Shared utilities (block placement, vegetation, resource tracking)
+- **ReplaceStrategy:** Original replace-only logic (6 original modes)
+- **FillStrategy:** Fills air gaps within terrain
+- **FlattenStrategy:** Levels terrain to target height
+- **FloodStrategy:** Fills area with water
+- **NaturalizeStrategy:** Organic erosion using Perlin noise
 
 **BiomePalette.java** - Biome-specific block selection
 - Static utility class
@@ -134,10 +161,12 @@ com.wcholmes.landscaper/
 **NaturalizationConfig.java** - Configuration system
 - Format: JSON with Gson (pretty-printed)
 - Location: `config/landscaper-naturalization.json`
-- Settings: radius (1-50), consume_resources, overworld_only, show_highlight, messy_edge, circle_shape
+- **Basic Settings:** radius (1-50), consume_resources, overworld_only, show_highlight, messy_edge, circle_shape, vegetation_density
+- **NEW Advanced Settings:** max_flatten_height (1-320), erosion_strength (1-10), roughness_amount (0.0-5.0)
 - 33 default safe blocks (terrain types that won't be replaced)
 - Auto-creates config with descriptions on first load
 - Lazy loading pattern
+- All settings accessible via in-game GUI (press K)
 
 ### Key Design Patterns
 
@@ -279,19 +308,66 @@ Diamond + Emerald + Grass Block + Dirt + Stone
 6. **Messy Path** - Varied path terrain
    - Mixed path blocks with variation
 
+---
+
+### NEW MODES (v2.3.0)
+
+7. **FILL (Fill Below)** - Fills air gaps within terrain
+   - Uses same depth logic as original modes (surface ±10 blocks)
+   - **Key difference:** ALSO fills air blocks (original skips air)
+   - Fills caves, gaps, and hollow areas with biome-appropriate blocks
+   - Perfect for solidifying floating islands or filling underground voids
+   - Uses biome palettes for natural fill material
+   - Example: Clicking on grass above a cave will fill the cave with dirt/stone
+
+8. **FLATTEN (Flatten Terrain)** - Levels terrain to clicked block height
+   - Target height = Y-level of clicked block
+   - Removes blocks above target, adds blocks below target
+   - Configurable `max_flatten_height` (1-320) limits upward checking
+   - Surface finished with biome-appropriate blocks
+   - Perfect for creating plateaus, foundations, or leveling mountains
+   - Example: Click at Y=64 to flatten everything in radius to sea level
+
+9. **FLOOD (Flood with Water)** - Fills area with water
+   - Fills selection with water blocks up to clicked block Y-level
+   - Creates lakes, ponds, moats, or water features
+   - Only fills air spaces (doesn't replace solid blocks)
+   - Respects radius and shape settings (circle/square)
+   - Perfect for creating water bodies or flooding valleys
+   - Example: Click at Y=70 to create a lake 6 blocks deep
+
+10. **NATURALIZE (Natural Erosion)** - Creates organic terrain variation
+    - **Perlin noise** generates smooth rolling hills (±3-5 blocks variation)
+    - **Roughness layer** adds weathered appearance (±1-2 blocks)
+    - **Height-based variation** for natural look (more variation in valleys, smoother on peaks)
+    - Looks like native Minecraft terrain generation
+    - Configurable `erosion_strength` (1-10 blocks) and `roughness_amount` (0.0-5.0)
+    - Perfect for naturalizing flat areas or adding organic terrain features
+    - Creates depressions and mounds for realistic landscape
+    - Example: Turn a flat plain into rolling hills with natural variation
+
 ### Configuration Options
 
 **File:** `config/landscaper-naturalization.json`
 
+**Basic Settings:**
 - **radius:** 1-50 (default: 5) - Effect radius in blocks
 - **consume_resources:** true/false - Whether to consume inventory items
 - **overworld_only:** true/false - Restrict to Overworld dimension
 - **show_highlight:** true/false - Show block highlight overlay
-- **messy_edge:** true/false - Randomize edges for natural look
+- **messy_edge_extension:** 0-3 (default: 2) - Blocks beyond radius for messy edge randomization
 - **circle_shape:** true/false - Circle vs square shape
+- **vegetation_density:** NONE, LOW (2.5%), MEDIUM (7.5%), HIGH (15%), VERY_HIGH (30%)
 - **safe_blocks:** List of block IDs that won't be replaced
 
-Access via GUI (press K in-game) or edit JSON directly.
+**NEW Advanced Settings (v2.3.0):**
+- **max_flatten_height:** 1-320 (default: 50) - Max height difference for FLATTEN mode to check/modify
+- **erosion_strength:** 1-10 (default: 3) - Height variation strength for NATURALIZE mode (in blocks)
+- **roughness_amount:** 0.0-5.0 (default: 1.5) - Roughness/weathering multiplier for NATURALIZE mode
+
+**Access:**
+- In-game GUI with 8 sliders (press **K** key)
+- OR edit JSON directly in `config/landscaper-naturalization.json`
 
 ---
 

@@ -22,13 +22,22 @@ public class PlayerConfig {
         public boolean consumeResources;
         public boolean overworldOnly;
 
+        // New advanced settings
+        public int maxFlattenHeight;
+        public int erosionStrength;
+        public double roughnessAmount;
+
         public PlayerSettings(int radius, NaturalizationConfig.VegetationDensity vegetationDensity,
-                            int messyEdgeExtension, boolean consumeResources, boolean overworldOnly) {
+                            int messyEdgeExtension, boolean consumeResources, boolean overworldOnly,
+                            int maxFlattenHeight, int erosionStrength, double roughnessAmount) {
             this.radius = radius;
             this.vegetationDensity = vegetationDensity;
             this.messyEdgeExtension = messyEdgeExtension;
             this.consumeResources = consumeResources;
             this.overworldOnly = overworldOnly;
+            this.maxFlattenHeight = maxFlattenHeight;
+            this.erosionStrength = erosionStrength;
+            this.roughnessAmount = roughnessAmount;
         }
 
         // Create from global defaults
@@ -38,7 +47,10 @@ public class PlayerConfig {
                 NaturalizationConfig.getVegetationDensity(),
                 NaturalizationConfig.getMessyEdgeExtension(),
                 NaturalizationConfig.shouldConsumeResources(),
-                NaturalizationConfig.isOverworldOnly()
+                NaturalizationConfig.isOverworldOnly(),
+                NaturalizationConfig.getMaxFlattenHeight(),
+                NaturalizationConfig.getErosionStrength(),
+                NaturalizationConfig.getRoughnessAmount()
             );
         }
     }
@@ -58,9 +70,13 @@ public class PlayerConfig {
                                            NaturalizationConfig.VegetationDensity vegetationDensity,
                                            int messyEdgeExtension,
                                            boolean consumeResources,
-                                           boolean overworldOnly) {
+                                           boolean overworldOnly,
+                                           int maxFlattenHeight,
+                                           int erosionStrength,
+                                           double roughnessAmount) {
         playerSettings.put(playerUuid, new PlayerSettings(
-            radius, vegetationDensity, messyEdgeExtension, consumeResources, overworldOnly
+            radius, vegetationDensity, messyEdgeExtension, consumeResources, overworldOnly,
+            maxFlattenHeight, erosionStrength, roughnessAmount
         ));
     }
 
