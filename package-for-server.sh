@@ -11,9 +11,19 @@ echo "📦 Packaging Landscaper v${VERSION} for server deployment..."
 # Create package directory
 mkdir -p "$PACKAGE_DIR"
 
-# Copy mod JAR
-echo "  → Copying mod JAR..."
+# Copy Landscaper mod JAR
+echo "  → Copying Landscaper mod JAR..."
 cp "build/libs/landscaper-${VERSION}.jar" "$PACKAGE_DIR/"
+
+# Copy ModUpdater mod JAR (try test instance first, then build folder)
+echo "  → Copying ModUpdater mod JAR..."
+if cp "/c/Users/Bill/curseforge/minecraft/Instances/test/mods/modupdater-"*.jar "$PACKAGE_DIR/" 2>/dev/null; then
+    echo "    ✓ ModUpdater copied from test instance"
+elif cp "D:/code/minecraft/Updater/build/libs/modupdater-"*.jar "$PACKAGE_DIR/" 2>/dev/null; then
+    echo "    ✓ ModUpdater copied from build folder"
+else
+    echo "    WARNING: ModUpdater JAR not found"
+fi
 
 # Copy config file
 echo "  → Copying config file..."

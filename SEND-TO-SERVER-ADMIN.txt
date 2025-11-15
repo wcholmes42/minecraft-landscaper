@@ -1,0 +1,89 @@
+═══════════════════════════════════════════════════════════════
+  LANDSCAPER MOD v3.0.4 - SERVER DEPLOYMENT INSTRUCTIONS
+═══════════════════════════════════════════════════════════════
+
+📦 FILES TO SEND TO SERVER ADMIN:
+
+1. landscaper-3.0.4.jar
+   Location: D:\code\minecraft\Landscaper\build\libs\landscaper-3.0.4.jar
+   Destination: Server mods/ folder
+
+2. modupdater-1.2.31.jar
+   Location: C:\Users\Bill\curseforge\minecraft\Instances\test\mods\modupdater-1.2.31.jar
+   Destination: Server mods/ folder
+
+3. landscaper-naturalization.json
+   Location: C:\Users\Bill\curseforge\minecraft\Instances\test\config\landscaper-naturalization.json
+   Destination: Server config/ folder
+
+4. DEPLOYMENT-INSTRUCTIONS.md (optional - has full setup guide)
+
+═══════════════════════════════════════════════════════════════
+
+🚀 SERVER ADMIN INSTALLATION:
+
+1. Copy BOTH mod JARs to server/mods/:
+   - landscaper-3.0.4.jar
+   - modupdater-1.2.31.jar
+
+2. Copy config to server/config/:
+   - landscaper-naturalization.json
+
+3. Restart server
+
+4. Verify in logs:
+   - "Loaded mod: Terrain Naturalization Tools 3.0.4"
+   - "Loaded mod: ModUpdater 1.2.31"
+
+═══════════════════════════════════════════════════════════════
+
+👥 PLAYER INSTALLATION:
+
+Players need BOTH mods in their client mods/ folder:
+
+1. landscaper-3.0.4.jar
+   Download: https://github.com/wcholmes42/minecraft-landscaper/releases/tag/v3.0.4
+
+2. modupdater-1.2.31.jar
+   (Server admin should provide this OR point to download link)
+
+Install location (both JARs):
+- Windows: %appdata%\.minecraft\mods\
+- macOS: ~/Library/Application Support/minecraft/mods/
+- Linux: ~/.minecraft/mods/
+
+Then restart Minecraft.
+
+═══════════════════════════════════════════════════════════════
+
+✅ VERSION COMPATIBILITY:
+
+Server Mods:
+  - landscaper-3.0.4.jar
+  - modupdater-1.2.31.jar
+
+Client Mods (MUST MATCH SERVER!):
+  - landscaper-3.0.4.jar
+  - modupdater-1.2.31.jar
+
+Minecraft:  1.20.1
+Forge:      47.4.0 or higher
+
+⚠️ All players MUST have the SAME mod versions as the server!
+
+═══════════════════════════════════════════════════════════════
+
+🎮 HOW TO USE IN-GAME:
+
+1. Get staff from creative inventory (search "naturalization")
+2. Right-click on TOP of grass blocks
+3. Press V to cycle through 10 modes
+4. Press K to open config GUI (8 settings)
+
+NEW MODES in v3.0+:
+- FILL: Fills air gaps in terrain
+- FLATTEN: Levels terrain to clicked height
+- FLOOD: Fills area with water
+- NATURALIZE: Creates organic erosion patterns
+
+═══════════════════════════════════════════════════════════════
