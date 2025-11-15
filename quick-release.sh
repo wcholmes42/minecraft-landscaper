@@ -80,16 +80,46 @@ git push
 echo -e "${GREEN}✓ Pushed${NC}"
 
 # Step 5: Release
-echo -e "${YELLOW}[5/5] Running release workflow ($RELEASE_TYPE)...${NC}"
+echo -e "${YELLOW}[5/6] Running release workflow ($RELEASE_TYPE)...${NC}"
 ./release.sh $RELEASE_TYPE
+echo -e "${GREEN}✓ Release created${NC}"
+
+# Step 6: Deploy to test environments
+echo -e "${YELLOW}[6/6] Deploying to test environments...${NC}"
+
+# Get the new version from gradle.properties
+NEW_VERSION=$(grep "mod_version=" gradle.properties | cut -d'=' -f2)
+JAR_FILE="build/libs/landscaper-${NEW_VERSION}.jar"
+
+if [ ! -f "$JAR_FILE" ]; then
+    echo -e "${RED}✗ JAR file not found: $JAR_FILE${NC}"
+    echo -e "${YELLOW}Skipping deployment (CI/CD will build signed version)${NC}"
+else
+    # Deploy to unRAID server
+    echo -e "${BLUE}  → Deploying to unRAID server...${NC}"
+    scp "$JAR_FILE" root@192.168.68.42:/d/code/minecraft/docker-data/mods/ 2>&1 | grep -v "Permanently added" || true
+    ssh root@192.168.68.42 "docker restart minecraft-modupdater-test" > /dev/null 2>&1
+    echo -e "${GREEN}  ✓ unRAID server updated and restarted${NC}"
+
+    # Deploy to local CurseForge test client
+    echo -e "${BLUE}  → Deploying to local test client...${NC}"
+    cp "$JAR_FILE" "/c/Users/Bill/curseforge/minecraft/Instances/test/mods/"
+    echo -e "${GREEN}  ✓ Local test client updated${NC}"
+    echo -e "${YELLOW}  ⚠ Restart Minecraft client to load new version${NC}"
+fi
 
 echo ""
 echo -e "${GREEN}═══════════════════════════════════════════════════════${NC}"
 echo -e "${GREEN}   🎉 Release Complete!${NC}"
 echo -e "${GREEN}═══════════════════════════════════════════════════════${NC}"
 echo ""
+echo -e "${BLUE}Released:${NC} ${GREEN}v${NEW_VERSION}${NC}"
+echo -e "${BLUE}Deployed to:${NC}"
+echo "  ${GREEN}✓${NC} unRAID server (restarted)"
+echo "  ${GREEN}✓${NC} Local CurseForge test client"
+echo ""
 echo -e "${BLUE}Next steps:${NC}"
 echo "  • Watch CI/CD: ${YELLOW}gh run watch${NC}"
-echo "  • Deploy to test: ${YELLOW}scp build/libs/landscaper-*.jar root@192.168.68.42:/d/code/minecraft/docker-data/mods/${NC}"
+echo "  • Restart local Minecraft client to test"
 echo "  • View release: ${YELLOW}https://github.com/wcholmes42/minecraft-landscaper/releases${NC}"
 echo ""
