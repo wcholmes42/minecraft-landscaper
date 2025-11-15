@@ -80,12 +80,17 @@ git push
 echo -e "${GREEN}✓ Pushed${NC}"
 
 # Step 5: Release
-echo -e "${YELLOW}[5/6] Running release workflow ($RELEASE_TYPE)...${NC}"
+echo -e "${YELLOW}[5/7] Running release workflow ($RELEASE_TYPE)...${NC}"
 ./release.sh $RELEASE_TYPE
 echo -e "${GREEN}✓ Release created${NC}"
 
-# Step 6: Deploy to test environments
-echo -e "${YELLOW}[6/6] Deploying to test environments...${NC}"
+# Step 6: Rebuild with new version
+echo -e "${YELLOW}[6/7] Rebuilding JAR with new version...${NC}"
+./gradlew build --warning-mode all > /dev/null 2>&1
+echo -e "${GREEN}✓ JAR rebuilt${NC}"
+
+# Step 7: Deploy to test environments
+echo -e "${YELLOW}[7/7] Deploying to test environments...${NC}"
 
 # Get the new version from gradle.properties
 NEW_VERSION=$(grep "mod_version=" gradle.properties | cut -d'=' -f2)
