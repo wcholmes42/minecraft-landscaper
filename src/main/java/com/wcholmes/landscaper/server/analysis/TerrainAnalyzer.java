@@ -45,10 +45,11 @@ public class TerrainAnalyzer {
                 heights.add(surfaceY);
                 heightDistribution.merge(surfaceY, 1, Integer::sum);
 
-                // Sample SURFACE block (y=0) - the top layer
+                // Sample SURFACE block (y=0) - only TRUE surface blocks (filter out stone/ores)
                 BlockState surfaceState = level.getBlockState(surface);
-                if (!surfaceState.isAir()) {
-                    surfaceBlockCounts.merge(surfaceState.getBlock(), 1, Integer::sum);
+                Block surfaceBlock = surfaceState.getBlock();
+                if (!surfaceState.isAir() && isSurfaceBlock(surfaceBlock)) {
+                    surfaceBlockCounts.merge(surfaceBlock, 1, Integer::sum);
                 }
 
                 // Sample SUBSURFACE blocks (y=1-9) - layers below
@@ -174,5 +175,29 @@ public class TerrainAnalyzer {
             return TerrainProfile.WaterType.RIVER;
 
         return TerrainProfile.WaterType.LAKE;
+    }
+
+    /**
+     * Check if a block is a valid natural surface block (not stone/ore/etc.)
+     */
+    private static boolean isSurfaceBlock(Block block) {
+        // Natural surface blocks that should be on top layer
+        return block == Blocks.GRASS_BLOCK ||
+               block == Blocks.DIRT ||
+               block == Blocks.COARSE_DIRT ||
+               block == Blocks.PODZOL ||
+               block == Blocks.MYCELIUM ||
+               block == Blocks.SAND ||
+               block == Blocks.RED_SAND ||
+               block == Blocks.GRAVEL ||
+               block == Blocks.DIRT_PATH ||
+               block == Blocks.FARMLAND ||
+               block == Blocks.MUD ||
+               block == Blocks.CLAY ||
+               block == Blocks.SNOW_BLOCK ||
+               block == Blocks.SNOW ||
+               block == Blocks.POWDER_SNOW ||
+               block == Blocks.MOSSY_COBBLESTONE; // Jungle/swamp surface
+        // Explicitly EXCLUDE: Stone, ores, cobblestone, deepslate, etc.
     }
 }
