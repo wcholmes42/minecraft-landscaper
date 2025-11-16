@@ -85,9 +85,10 @@ public class IntelligentNaturalizeStrategy {
                 // Preserve elevation if:
                 // - This is a hill/mountain/feature, OR
                 // - Area is very homogeneous (>95% one block) - keep it flat/stable
-                // Only replace surface block to match dominant type
-                Block surfaceBlock = profile.getConsistencyAwareSurfaceBlock();
-                level.setBlock(surfacePos, surfaceBlock.defaultBlockState(), 3);
+                // Only replace surface block to match dominant type (with bilateral blend)
+                Block proposed = profile.getConsistencyAwareSurfaceBlock();
+                Block filtered = BilateralBlockFilter.filterBlock(level, surfacePos, proposed);
+                level.setBlock(surfacePos, filtered.defaultBlockState(), 3);
                 blocksChanged++;
                 continue; // NO height modification
             }
@@ -118,9 +119,10 @@ public class IntelligentNaturalizeStrategy {
             // Place new surface based on sampled area
             BlockPos newSurface = surfacePos.above(Math.max(0, heightDiff));
 
-            // SURFACE LAYER - Use CONSISTENCY-AWARE selection (mono areas stay mono)
-            Block surfaceBlock = profile.getConsistencyAwareSurfaceBlock();
-            level.setBlock(newSurface, surfaceBlock.defaultBlockState(), 3);
+            // SURFACE LAYER - Use bilateral filter for smooth blending
+            Block proposedSurface = profile.getConsistencyAwareSurfaceBlock();
+            Block filteredSurface = BilateralBlockFilter.filterBlock(level, newSurface, proposedSurface);
+            level.setBlock(newSurface, filteredSurface.defaultBlockState(), 3);
             blocksChanged++;
 
             // SUBSURFACE LAYERS - Use CONSISTENCY-AWARE subsurface (stone mountains stay stone!)

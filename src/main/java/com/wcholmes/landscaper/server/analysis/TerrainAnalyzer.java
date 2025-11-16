@@ -24,8 +24,8 @@ public class TerrainAnalyzer {
      * Samples 48-block radius (3 chunks) in all directions.
      */
     public static TerrainProfile analyze(Level level, BlockPos center) {
-        Map<Block, Integer> surfaceBlockCounts = new HashMap<>();
-        Map<Block, Integer> subsurfaceBlockCounts = new HashMap<>();
+        Map<Block, Double> surfaceBlockWeights = new HashMap<>(); // Changed to weighted
+        Map<Block, Double> subsurfaceBlockWeights = new HashMap<>(); // Changed to weighted
         Map<Block, Integer> vegetationCounts = new HashMap<>();
         List<Integer> heights = new ArrayList<>();
         Map<Integer, Integer> heightDistribution = new HashMap<>();
@@ -40,35 +40,40 @@ public class TerrainAnalyzer {
         List<Integer> snowElevations = new ArrayList<>();
         boolean hasSnowLayers = false;
 
-        // Sample the chunk area
+        // Sample the chunk area with DISTANCE WEIGHTING
         for (int x = -CHUNK_RADIUS; x <= CHUNK_RADIUS; x += SAMPLE_DENSITY) {
             for (int z = -CHUNK_RADIUS; z <= CHUNK_RADIUS; z += SAMPLE_DENSITY) {
                 BlockPos samplePos = center.offset(x, 0, z);
                 BlockPos surface = TerrainUtils.findSurface(level, samplePos);
                 if (surface == null) continue;
 
+                // Calculate distance weight - closer blocks weighted MORE heavily
+                double distance = Math.sqrt(x * x + z * z);
+                double distanceWeight = Math.exp(-(distance * distance) / (2 * 20 * 20)); // Gaussian
+                // Closer = weight ~1.0, at edge = weight ~0.1
+
                 int surfaceY = surface.getY();
                 heights.add(surfaceY);
                 heightDistribution.merge(surfaceY, 1, Integer::sum);
 
-                // Sample SURFACE block with intelligent classification
+                // Sample SURFACE block with DISTANCE WEIGHTING
                 BlockState surfaceState = level.getBlockState(surface);
                 Block surfaceBlock = surfaceState.getBlock();
 
                 if (!surfaceState.isAir()) {
                     // Check if this is a NATURAL surface block or exposed subsurface
                     if (isNaturalSurfaceBlock(surfaceBlock)) {
-                        // Natural surface - count it
-                        surfaceBlockCounts.merge(surfaceBlock, 1, Integer::sum);
+                        // Natural surface - count with distance weight
+                        surfaceBlockWeights.merge(surfaceBlock, distanceWeight, Double::sum);
                     } else {
                         // Exposed subsurface (stone outcrop, ore, etc.)
                         // Look at neighbors to find what SHOULD be the surface
                         Block naturalSurface = findNaturalSurfaceNearby(level, surface);
                         if (naturalSurface != null) {
-                            surfaceBlockCounts.merge(naturalSurface, 1, Integer::sum);
+                            surfaceBlockWeights.merge(naturalSurface, distanceWeight, Double::sum);
                         } else {
                             // No natural surface nearby - this IS the natural surface (stone mountain)
-                            surfaceBlockCounts.merge(surfaceBlock, 1, Integer::sum);
+                            surfaceBlockWeights.merge(surfaceBlock, distanceWeight, Double::sum);
                         }
                     }
                 }
@@ -80,7 +85,7 @@ public class TerrainAnalyzer {
                     Block block = state.getBlock();
 
                     if (!state.isAir()) {
-                        subsurfaceBlockCounts.merge(block, 1, Integer::sum);
+                        subsurfaceBlockWeights.merge(block, distanceWeight, Double::sum);
                         totalBlocks++;
 
                         if (block == Blocks.WATER) {
@@ -149,6 +154,10 @@ public class TerrainAnalyzer {
         int snowThreshold = snowElevations.isEmpty() ?
             9999 : // No snow found - set very high
             snowElevations.stream().min(Integer::compare).orElse(9999);
+
+        // Convert weighted maps to integer maps (for compatibility)
+        Map<Block, Integer> surfaceBlockCounts = convertWeightsToIntegers(surfaceBlockWeights);
+        Map<Block, Integer> subsurfaceBlockCounts = convertWeightsToIntegers(subsurfaceBlockWeights);
 
         return new TerrainProfile(
             surfaceBlockCounts, subsurfaceBlockCounts, vegetationCounts, vegetationDensity,
@@ -219,6 +228,23 @@ public class TerrainAnalyzer {
             return TerrainProfile.WaterType.RIVER;
 
         return TerrainProfile.WaterType.LAKE;
+    }
+
+    /**
+     * Convert weighted map to integer map (scale weights to counts)
+     */
+    private static Map<Block, Integer> convertWeightsToIntegers(Map<Block, Double> weights) {
+        Map<Block, Integer> counts = new HashMap<>();
+
+        // Scale weights to reasonable integer range (multiply by 100)
+        for (Map.Entry<Block, Double> entry : weights.entrySet()) {
+            int scaledCount = (int) Math.round(entry.getValue() * 100);
+            if (scaledCount > 0) {
+                counts.put(entry.getKey(), scaledCount);
+            }
+        }
+
+        return counts;
     }
 
     /**
