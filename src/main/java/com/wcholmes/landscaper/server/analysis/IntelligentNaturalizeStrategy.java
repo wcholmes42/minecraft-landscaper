@@ -127,7 +127,11 @@ public class IntelligentNaturalizeStrategy {
             }
         }
 
-        // Pass 4: Clean up item drops
+        // Pass 4: Apply water features (respects water type rules)
+        int waterBlocks = WaterFeatureManager.applyWaterFeatures(level, positions, profile);
+        blocksChanged += waterBlocks;
+
+        // Pass 5: Clean up item drops
         AABB bounds = new AABB(surface).inflate(radius + messyEdge);
         level.getEntitiesOfClass(ItemEntity.class, bounds).forEach(ItemEntity::discard);
 
