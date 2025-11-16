@@ -124,20 +124,27 @@ public class TerrainProfile {
     }
 
     /**
-     * Check if terrain is homogeneous (one block type dominates >80%)
+     * Check if terrain is homogeneous (one block type dominates >90%)
      */
     public boolean isHomogeneous() {
-        return getSurfaceConsistency() > 0.80;
+        return getSurfaceConsistency() > 0.90;
+    }
+
+    /**
+     * Check if terrain is VERY homogeneous (>95% - pure mono-block)
+     */
+    public boolean isVeryHomogeneous() {
+        return getSurfaceConsistency() > 0.95;
     }
 
     /**
      * Get surface block with consistency-aware selection:
-     * - Homogeneous areas (>80% one type): Always use dominant block
+     * - Homogeneous areas (>90% one type): Always use dominant block
      * - Diverse areas: Use weighted random
      */
     public Block getConsistencyAwareSurfaceBlock() {
         if (isHomogeneous()) {
-            // Mono-block area - use dominant block exclusively
+            // Mono-block area - use dominant block EXCLUSIVELY (no variation)
             return getDominantSurfaceBlock();
         } else {
             // Diverse area - use weighted random

@@ -11,6 +11,7 @@ import com.wcholmes.landscaper.server.PlayerSettings;
 import com.wcholmes.landscaper.server.analysis.TerrainAnalyzer;
 import com.wcholmes.landscaper.server.analysis.TerrainProfile;
 import com.wcholmes.landscaper.server.analysis.IntelligentNaturalizeStrategy;
+import com.wcholmes.landscaper.server.analysis.AccuracyValidator;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -149,6 +150,14 @@ public class LandscaperCommand {
             "§6Applying natural style to §e" + radius + "§6 block radius..."
         ), false);
 
+        // Get positions for validation
+        java.util.List<BlockPos> targetPositions = NaturalizationConfig.isCircleShape() ?
+            getCirclePositions(surfacePos, radius) :
+            getSquarePositions(surfacePos, radius);
+
+        // CAPTURE BEFORE snapshot
+        AccuracyValidator.Snapshot before = AccuracyValidator.captureSnapshot(level, targetPositions);
+
         // APPLY using intelligent strategy
         int blocksChanged = IntelligentNaturalizeStrategy.apply(
             level,
@@ -159,11 +168,44 @@ public class LandscaperCommand {
             NaturalizationConfig.getMessyEdgeExtension()
         );
 
+        // CAPTURE AFTER snapshot and validate
+        AccuracyValidator.Snapshot after = AccuracyValidator.captureSnapshot(level, targetPositions);
+        AccuracyValidator.ValidationResult validation = AccuracyValidator.validate(before, after, profile);
+
         source.sendSuccess(() -> Component.literal(
-            "§a✓ Complete! §6Modified §e" + blocksChanged + " §6blocks using sampled terrain style"
+            "§a✓ Complete! §6Modified §e" + blocksChanged + " §6blocks\n" +
+            "§7Accuracy: " + validation.getGrade() + " §e" + String.format("%.0f%%", validation.overallScore * 100) + "\n" +
+            "§7  Consistency: §e" + String.format("%.0f%%", validation.consistencyMatch * 100) + " §7(" +
+                String.format("%.0f%%", validation.beforeConsistency * 100) + " → " +
+                String.format("%.0f%%", validation.afterConsistency * 100) + ")\n" +
+            "§7  Elevation: §e" + String.format("%.0f%%", validation.elevationPreservation * 100) + " §7(" +
+                validation.beforeRange + " → " + validation.afterRange + " range)\n" +
+            "§7  Block Match: " + (validation.blockMatch ? "§a✓" : "§c✗")
         ), false);
 
         return 1;
+    }
+
+    private static java.util.List<BlockPos> getCirclePositions(BlockPos center, int radius) {
+        java.util.List<BlockPos> positions = new java.util.ArrayList<>();
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                if (Math.sqrt(x * x + z * z) <= radius) {
+                    positions.add(center.offset(x, 0, z));
+                }
+            }
+        }
+        return positions;
+    }
+
+    private static java.util.List<BlockPos> getSquarePositions(BlockPos center, int radius) {
+        java.util.List<BlockPos> positions = new java.util.ArrayList<>();
+        for (int x = -radius; x <= radius; x++) {
+            for (int z = -radius; z <= radius; z++) {
+                positions.add(center.offset(x, 0, z));
+            }
+        }
+        return positions;
     }
 
     private static void applyNaturalization(ServerLevel level, ServerPlayer player, BlockPos center, NaturalizationMode mode, int radius) {

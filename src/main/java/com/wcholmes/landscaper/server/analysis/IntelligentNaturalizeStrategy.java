@@ -81,20 +81,23 @@ public class IntelligentNaturalizeStrategy {
             // PRESERVE TERRAIN FEATURES: Check local elevation variation
             boolean isSignificantFeature = isTerrainFeature(level, surfacePos, profile);
 
-            if (isSignificantFeature) {
-                // This is a hill/mountain/feature - only replace surface block, DON'T modify height
+            if (isSignificantFeature || profile.isVeryHomogeneous()) {
+                // Preserve elevation if:
+                // - This is a hill/mountain/feature, OR
+                // - Area is very homogeneous (>95% one block) - keep it flat/stable
+                // Only replace surface block to match dominant type
                 Block surfaceBlock = profile.getConsistencyAwareSurfaceBlock();
                 level.setBlock(surfacePos, surfaceBlock.defaultBlockState(), 3);
                 blocksChanged++;
-                continue; // Preserve elevation
+                continue; // NO height modification
             }
 
             // Calculate target height based on profile's height distribution and smoothness
             int targetY = calculateTargetHeight(pos, surface, profile);
             int heightDiff = targetY - currentY;
 
-            // Limit height changes to prevent aggressive modification (max ±2 blocks)
-            heightDiff = Math.max(-2, Math.min(2, heightDiff));
+            // Limit height changes to prevent aggressive modification (max ±1 block for safety)
+            heightDiff = Math.max(-1, Math.min(1, heightDiff));
 
             // Apply height changes with profile-based blocks
             if (heightDiff > 0) {
@@ -268,19 +271,21 @@ public class IntelligentNaturalizeStrategy {
 
         if (totalChecked == 0) return false;
 
-        // Feature detection: position is higher than 60%+ of local neighbors
-        // OR has significant local variation (peak or valley)
+        // Feature detection: More aggressive to preserve terrain
         double higherRatio = (double) higherCount / totalChecked;
         double lowerRatio = (double) lowerCount / totalChecked;
 
-        // Is a peak if most neighbors are lower
-        boolean isPeak = lowerRatio > 0.6;
+        // Is a peak if 50%+ neighbors are lower (more aggressive)
+        boolean isPeak = lowerRatio > 0.5;
 
-        // Is part of steep terrain if lots of elevation change
+        // Is a valley if 50%+ neighbors are higher
+        boolean isValley = higherRatio > 0.5;
+
+        // Is part of steep/varied terrain if mixed elevations
         boolean isSteep = (higherCount > 0 && lowerCount > 0) &&
-                         ((higherRatio > 0.4 && lowerRatio > 0.4));
+                         ((higherRatio > 0.3 && lowerRatio > 0.3));
 
-        return isPeak || isSteep;
+        return isPeak || isValley || isSteep;
     }
 
     private static boolean isVegetation(BlockState state) {
