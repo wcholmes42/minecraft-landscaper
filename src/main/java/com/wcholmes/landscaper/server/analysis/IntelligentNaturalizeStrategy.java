@@ -46,13 +46,9 @@ public class IntelligentNaturalizeStrategy {
         BlockPos surface = TerrainUtils.findSurface(level, center);
         if (surface == null) return 0;
 
-        // EMERGENCY SAFETY: Skip beach/river entirely until water issue resolved
-        if (profile.getWaterType() == TerrainProfile.WaterType.BEACH ||
-            profile.getWaterType() == TerrainProfile.WaterType.RIVER) {
-            LOGGER.warn("⚠️  BEACH/RIVER detected at {} - terrain modification ABORTED for safety", center);
-            LOGGER.warn("   Water type: {}, density: {}%", profile.getWaterType(), String.format("%.1f", profile.getWaterDensity() * 100));
-            return 0; // ABORT - beaches are broken, skip completely
-        }
+        // Log water type for debugging
+        LOGGER.info("Water type detected: {}, density: {}%",
+            profile.getWaterType(), String.format("%.1f", profile.getWaterDensity() * 100));
 
         LOGGER.info("Starting intelligent naturalization at {} radius={}", center, radius);
         LOGGER.info("  Profile: consistency={}% homogeneous={} veryHomogeneous={}",

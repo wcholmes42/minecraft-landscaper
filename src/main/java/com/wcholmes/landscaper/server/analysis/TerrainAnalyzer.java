@@ -215,9 +215,17 @@ public class TerrainAnalyzer {
     private static TerrainProfile.WaterType detectWaterType(
         int waterBlocks, int totalBlocks, int beachSand, int flowingWater, int swampMud, int avgY
     ) {
-        if (waterBlocks == 0) return TerrainProfile.WaterType.NONE;
+        // FIXED: Return NONE if no water detected
+        if (waterBlocks == 0) {
+            return TerrainProfile.WaterType.NONE;
+        }
 
         double waterRatio = (double) waterBlocks / Math.max(1, totalBlocks);
+
+        // Need minimum water presence to classify type
+        if (waterRatio < 0.05) {
+            return TerrainProfile.WaterType.NONE; // Too little water to classify
+        }
 
         if (beachSand > 20 && avgY < 70 && waterRatio > 0.1)
             return TerrainProfile.WaterType.BEACH;
@@ -225,7 +233,7 @@ public class TerrainAnalyzer {
         if (swampMud > 10 && waterRatio > 0.15)
             return TerrainProfile.WaterType.SWAMP;
 
-        if (flowingWater > waterBlocks / 3 && waterRatio < 0.3)
+        if (flowingWater > waterBlocks / 3 && waterRatio > 0.05) // Added minimum threshold
             return TerrainProfile.WaterType.RIVER;
 
         return TerrainProfile.WaterType.LAKE;
