@@ -64,16 +64,29 @@ public class IntelligentNaturalizeStrategy {
             }
         }
 
-        // Pass 2: Apply terrain blocks using profile data
+        // Pass 2: Apply terrain blocks using profile data (preserve features, match consistency)
         for (BlockPos pos : positions) {
             BlockPos surfacePos = TerrainUtils.findSurface(level, pos);
             if (surfacePos == null) continue;
 
             int currentY = surfacePos.getY();
 
+            // PRESERVE TERRAIN FEATURES: Skip if significantly higher than average
+            int heightAboveAverage = currentY - profile.getAverageY();
+            if (heightAboveAverage > 3) {
+                // This is a hill/feature - only replace surface block, don't modify height
+                Block surfaceBlock = profile.getConsistencyAwareSurfaceBlock();
+                level.setBlock(surfacePos, surfaceBlock.defaultBlockState(), 3);
+                blocksChanged++;
+                continue; // Don't undercut hills
+            }
+
             // Calculate target height based on profile's height distribution and smoothness
             int targetY = calculateTargetHeight(pos, surface, profile);
             int heightDiff = targetY - currentY;
+
+            // Limit height changes to prevent undercutting (max ±2 blocks)
+            heightDiff = Math.max(-2, Math.min(2, heightDiff));
 
             // Apply height changes with profile-based blocks
             if (heightDiff > 0) {
@@ -84,7 +97,7 @@ public class IntelligentNaturalizeStrategy {
                     blocksChanged++;
                 }
             } else if (heightDiff < 0) {
-                // Dig down
+                // Dig down (limited)
                 for (int y = 0; y < Math.abs(heightDiff); y++) {
                     level.setBlock(surfacePos.above(y), Blocks.AIR.defaultBlockState(), 3);
                     blocksChanged++;
@@ -94,8 +107,8 @@ public class IntelligentNaturalizeStrategy {
             // Place new surface based on sampled area
             BlockPos newSurface = surfacePos.above(Math.max(0, heightDiff));
 
-            // SURFACE LAYER - Use surface block palette for natural consistency
-            Block surfaceBlock = profile.getWeightedRandomSurfaceBlock();
+            // SURFACE LAYER - Use CONSISTENCY-AWARE selection (mono areas stay mono)
+            Block surfaceBlock = profile.getConsistencyAwareSurfaceBlock();
             level.setBlock(newSurface, surfaceBlock.defaultBlockState(), 3);
             blocksChanged++;
 

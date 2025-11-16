@@ -137,10 +137,12 @@ public class LandscaperCommand {
         TerrainProfile profile = TerrainAnalyzer.analyze(level, surfacePos);
 
         // Show analysis results
+        String consistency = profile.isHomogeneous() ? "§aHOMOGENEOUS" : "§eDIVERSE";
         source.sendSuccess(() -> Component.literal(
             "§6Analysis complete!\n" +
-            "§7Blocks: §e" + profile.getBlockPalette().size() + " types\n" +
-            "§7Vegetation: §e" + profile.getVegetationPalette().size() + " types (§e" + String.format("%.1f%%", profile.getVegetationDensity() * 100) + " density)\n" +
+            "§7Surface: §e" + profile.getBlockPalette().size() + " types §7(" + consistency + " §e" + String.format("%.0f%%", profile.getSurfaceConsistency() * 100) + "§7)\n" +
+            "§7Dominant: §e" + profile.getDominantSurfaceBlock().getName().getString() + "\n" +
+            "§7Vegetation: §e" + profile.getVegetationPalette().size() + " types (§e" + String.format("%.1f%%", profile.getVegetationDensity() * 100) + ")\n" +
             "§7Height: §e" + profile.getMinY() + "-" + profile.getMaxY() + " §7(avg: §e" + profile.getAverageY() + "§7)\n" +
             "§7Smoothness: §e" + String.format("%.1f%%", profile.getSmoothness() * 100) + "\n" +
             "§7Water: §e" + profile.getWaterType() + " §7(§e" + String.format("%.1f%%", profile.getWaterDensity() * 100) + "§7)\n" +

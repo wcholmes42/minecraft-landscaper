@@ -103,6 +103,41 @@ public class TerrainProfile {
     }
 
     /**
+     * Calculate surface block consistency (0.0 = diverse, 1.0 = mono-block)
+     * Returns the frequency of the dominant block
+     */
+    public double getSurfaceConsistency() {
+        if (surfaceBlockFrequency.isEmpty()) return 1.0;
+
+        // Consistency = frequency of most common block
+        return surfaceBlockFrequency.values().stream()
+            .max(Double::compare)
+            .orElse(0.0);
+    }
+
+    /**
+     * Check if terrain is homogeneous (one block type dominates >80%)
+     */
+    public boolean isHomogeneous() {
+        return getSurfaceConsistency() > 0.80;
+    }
+
+    /**
+     * Get surface block with consistency-aware selection:
+     * - Homogeneous areas (>80% one type): Always use dominant block
+     * - Diverse areas: Use weighted random
+     */
+    public Block getConsistencyAwareSurfaceBlock() {
+        if (isHomogeneous()) {
+            // Mono-block area - use dominant block exclusively
+            return getDominantSurfaceBlock();
+        } else {
+            // Diverse area - use weighted random
+            return getWeightedRandomSurfaceBlock();
+        }
+    }
+
+    /**
      * Get weighted random SURFACE block (for top layer)
      */
     public Block getWeightedRandomSurfaceBlock() {
