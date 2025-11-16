@@ -62,32 +62,47 @@ public abstract class BaseTerrainStrategy implements TerrainModificationStrategy
     protected TerrainPalette sampleSurroundingTerrain(Level level, BlockPos center, int sampleRadius) {
         TerrainPalette palette = new TerrainPalette();
 
+        LOGGER.info("=== TERRAIN SAMPLING DEBUG START ===");
+        LOGGER.info("Sample center: {}, radius: {}", center, sampleRadius);
+
         // Find the actual terrain surface at center (not water surface)
         BlockPos centerSurface = com.wcholmes.landscaper.common.util.TerrainUtils.findSurface(level, center);
         if (centerSurface == null) {
             centerSurface = center;
+            LOGGER.warn("findSurface returned null, using center position: {}", center);
         }
+        LOGGER.info("Center surface found at: {}", centerSurface);
 
         // Check if we're underwater - search down from surface for solid blocks
         BlockState centerSurfaceState = level.getBlockState(centerSurface);
         boolean isUnderwater = isUnderwater(level, centerSurface);
+        LOGGER.info("Center surface block: {}, isUnderwater: {}", centerSurfaceState.getBlock().getDescriptionId(), isUnderwater);
 
         // If underwater, find the actual floor
         BlockPos targetFloor = centerSurface;
         if (isUnderwater || centerSurfaceState.is(Blocks.WATER)) {
+            LOGGER.info("Underwater detected, searching for solid floor...");
             // Search down for solid ground
             for (int y = 0; y >= -20; y--) {
                 BlockPos checkPos = centerSurface.offset(0, y, 0);
                 BlockState checkState = level.getBlockState(checkPos);
+                Block checkBlock = checkState.getBlock();
+
                 if (!checkState.isAir() && !checkState.is(Blocks.WATER) && !checkState.is(Blocks.LAVA)) {
                     targetFloor = checkPos;
+                    LOGGER.info("Found floor at Y={}, block: {}", checkPos.getY(), checkBlock.getDescriptionId());
                     break;
                 }
             }
         }
 
         int targetY = targetFloor.getY();
-        LOGGER.info("Sampling around Y={} (underwater={})", targetY, isUnderwater);
+        LOGGER.info("TARGET SAMPLING DEPTH: Y={} (underwater={})", targetY, isUnderwater);
+
+        int totalSampled = 0;
+        int skippedAir = 0;
+        int skippedWater = 0;
+        int skippedUnsafe = 0;
 
         // Sample in a square pattern around the center at the TARGET DEPTH
         for (int xOffset = -sampleRadius; xOffset <= sampleRadius; xOffset++) {
@@ -101,14 +116,22 @@ public abstract class BaseTerrainStrategy implements TerrainModificationStrategy
                     Block block = state.getBlock();
 
                     // Skip air, water, lava
-                    if (state.isAir() || block == Blocks.WATER || block == Blocks.LAVA) {
+                    if (state.isAir()) {
+                        skippedAir++;
+                        continue;
+                    }
+                    if (block == Blocks.WATER || block == Blocks.LAVA) {
+                        skippedWater++;
                         continue;
                     }
 
                     // Only sample safe/natural blocks
                     if (!NaturalizationConfig.getSafeBlocks().contains(block)) {
+                        skippedUnsafe++;
                         continue;
                     }
+
+                    totalSampled++;
 
                     // Categorize by depth relative to target floor
                     if (depthOffset == 0) {
@@ -121,6 +144,15 @@ public abstract class BaseTerrainStrategy implements TerrainModificationStrategy
                 }
             }
         }
+
+        LOGGER.info("Sampling complete: {} blocks sampled, {} air skipped, {} water skipped, {} unsafe skipped",
+            totalSampled, skippedAir, skippedWater, skippedUnsafe);
+        LOGGER.info("PALETTE STATS: {}", palette.getStats());
+        LOGGER.info("Has valid samples: {}", palette.hasValidSamples());
+        if (palette.hasValidSamples()) {
+            LOGGER.info("DETAILED BREAKDOWN: {}", palette.getDetailedBreakdown());
+        }
+        LOGGER.info("=== TERRAIN SAMPLING DEBUG END ===");
 
         return palette;
     }
