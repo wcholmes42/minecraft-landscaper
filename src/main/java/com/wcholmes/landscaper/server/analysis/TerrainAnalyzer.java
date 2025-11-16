@@ -45,10 +45,11 @@ public class TerrainAnalyzer {
                 heights.add(surfaceY);
                 heightDistribution.merge(surfaceY, 1, Integer::sum);
 
-                // Sample SURFACE block (y=0) - only TRUE surface blocks (filter out stone/ores)
+                // Sample SURFACE block (y=0) - count WHATEVER is actually on top
+                // Don't filter - stone mountains need stone surface!
                 BlockState surfaceState = level.getBlockState(surface);
                 Block surfaceBlock = surfaceState.getBlock();
-                if (!surfaceState.isAir() && isSurfaceBlock(surfaceBlock)) {
+                if (!surfaceState.isAir()) {
                     surfaceBlockCounts.merge(surfaceBlock, 1, Integer::sum);
                 }
 

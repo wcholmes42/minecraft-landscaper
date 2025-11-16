@@ -71,21 +71,22 @@ public class IntelligentNaturalizeStrategy {
 
             int currentY = surfacePos.getY();
 
-            // PRESERVE TERRAIN FEATURES: Skip if significantly higher than average
-            int heightAboveAverage = currentY - profile.getAverageY();
-            if (heightAboveAverage > 3) {
-                // This is a hill/feature - only replace surface block, don't modify height
+            // PRESERVE TERRAIN FEATURES: Check local elevation variation
+            boolean isSignificantFeature = isTerrainFeature(level, surfacePos, profile);
+
+            if (isSignificantFeature) {
+                // This is a hill/mountain/feature - only replace surface block, DON'T modify height
                 Block surfaceBlock = profile.getConsistencyAwareSurfaceBlock();
                 level.setBlock(surfacePos, surfaceBlock.defaultBlockState(), 3);
                 blocksChanged++;
-                continue; // Don't undercut hills
+                continue; // Preserve elevation
             }
 
             // Calculate target height based on profile's height distribution and smoothness
             int targetY = calculateTargetHeight(pos, surface, profile);
             int heightDiff = targetY - currentY;
 
-            // Limit height changes to prevent undercutting (max ±2 blocks)
+            // Limit height changes to prevent aggressive modification (max ±2 blocks)
             heightDiff = Math.max(-2, Math.min(2, heightDiff));
 
             // Apply height changes with profile-based blocks
@@ -204,6 +205,50 @@ public class IntelligentNaturalizeStrategy {
         }
 
         return positions;
+    }
+
+    /**
+     * Detect terrain features (hills, peaks) using LOCAL elevation variation
+     * Better than global average - works on mountains too
+     */
+    private static boolean isTerrainFeature(Level level, BlockPos pos, TerrainProfile profile) {
+        int posY = pos.getY();
+
+        // Check local neighborhood (5-block radius)
+        int higherCount = 0;
+        int lowerCount = 0;
+        int totalChecked = 0;
+
+        for (int x = -5; x <= 5; x += 2) {
+            for (int z = -5; z <= 5; z += 2) {
+                if (x == 0 && z == 0) continue;
+
+                BlockPos neighbor = pos.offset(x, 0, z);
+                BlockPos neighborSurface = TerrainUtils.findSurface(level, neighbor);
+                if (neighborSurface == null) continue;
+
+                int neighborY = neighborSurface.getY();
+                if (neighborY > posY) higherCount++;
+                if (neighborY < posY) lowerCount++;
+                totalChecked++;
+            }
+        }
+
+        if (totalChecked == 0) return false;
+
+        // Feature detection: position is higher than 60%+ of local neighbors
+        // OR has significant local variation (peak or valley)
+        double higherRatio = (double) higherCount / totalChecked;
+        double lowerRatio = (double) lowerCount / totalChecked;
+
+        // Is a peak if most neighbors are lower
+        boolean isPeak = lowerRatio > 0.6;
+
+        // Is part of steep terrain if lots of elevation change
+        boolean isSteep = (higherCount > 0 && lowerCount > 0) &&
+                         ((higherRatio > 0.4 && lowerRatio > 0.4));
+
+        return isPeak || isSteep;
     }
 
     private static boolean isVegetation(BlockState state) {
