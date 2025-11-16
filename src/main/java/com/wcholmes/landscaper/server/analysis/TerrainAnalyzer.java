@@ -51,12 +51,26 @@ public class TerrainAnalyzer {
                 heights.add(surfaceY);
                 heightDistribution.merge(surfaceY, 1, Integer::sum);
 
-                // Sample SURFACE block (y=0) - count WHATEVER is actually on top
-                // Don't filter - stone mountains need stone surface!
+                // Sample SURFACE block with intelligent classification
                 BlockState surfaceState = level.getBlockState(surface);
                 Block surfaceBlock = surfaceState.getBlock();
+
                 if (!surfaceState.isAir()) {
-                    surfaceBlockCounts.merge(surfaceBlock, 1, Integer::sum);
+                    // Check if this is a NATURAL surface block or exposed subsurface
+                    if (isNaturalSurfaceBlock(surfaceBlock)) {
+                        // Natural surface - count it
+                        surfaceBlockCounts.merge(surfaceBlock, 1, Integer::sum);
+                    } else {
+                        // Exposed subsurface (stone outcrop, ore, etc.)
+                        // Look at neighbors to find what SHOULD be the surface
+                        Block naturalSurface = findNaturalSurfaceNearby(level, surface);
+                        if (naturalSurface != null) {
+                            surfaceBlockCounts.merge(naturalSurface, 1, Integer::sum);
+                        } else {
+                            // No natural surface nearby - this IS the natural surface (stone mountain)
+                            surfaceBlockCounts.merge(surfaceBlock, 1, Integer::sum);
+                        }
+                    }
                 }
 
                 // Sample SUBSURFACE blocks (y=1-9) - layers below
@@ -231,5 +245,60 @@ public class TerrainAnalyzer {
         if (log == Blocks.MANGROVE_PROPAGULE) return Blocks.MANGROVE_PROPAGULE;
         return null;
     }
+
+    /**
+     * Check if block is a NATURAL surface block (belongs on top layer naturally)
+     */
+    private static boolean isNaturalSurfaceBlock(Block block) {
+        return block == Blocks.GRASS_BLOCK ||
+               block == Blocks.DIRT ||
+               block == Blocks.PODZOL ||
+               block == Blocks.MYCELIUM ||
+               block == Blocks.SAND ||
+               block == Blocks.RED_SAND ||
+               block == Blocks.GRAVEL ||
+               block == Blocks.SNOW_BLOCK ||
+               block == Blocks.MUD ||
+               block == Blocks.CLAY ||
+               block == Blocks.MOSS_BLOCK ||
+               block == Blocks.DIRT_PATH ||
+               block == Blocks.FARMLAND;
+        // Note: Stone, ores, cobblestone are NOT natural surface (exposed subsurface)
+    }
+
+    /**
+     * Find natural surface blocks in nearby area (for exposed subsurface detection)
+     * Returns null if surrounding area is also exposed subsurface (true stone mountain)
+     */
+    private static Block findNaturalSurfaceNearby(Level level, BlockPos center) {
+        Map<Block, Integer> nearbyNaturalBlocks = new HashMap<>();
+
+        // Check 8-block radius for natural surface blocks
+        for (int x = -8; x <= 8; x += 2) {
+            for (int z = -8; z <= 8; z += 2) {
+                if (x == 0 && z == 0) continue;
+
+                BlockPos checkPos = center.offset(x, 0, z);
+                BlockState state = level.getBlockState(checkPos);
+                Block block = state.getBlock();
+
+                if (isNaturalSurfaceBlock(block)) {
+                    nearbyNaturalBlocks.merge(block, 1, Integer::sum);
+                }
+            }
+        }
+
+        // If we found natural surface blocks nearby, return the most common one
+        if (!nearbyNaturalBlocks.isEmpty()) {
+            return nearbyNaturalBlocks.entrySet().stream()
+                .max(Map.Entry.comparingByValue())
+                .map(Map.Entry::getKey)
+                .orElse(null);
+        }
+
+        // No natural surface nearby - exposed subsurface IS the surface here
+        return null;
+    }
 }
+
 
