@@ -56,24 +56,81 @@ public abstract class BaseTerrainStrategy implements TerrainModificationStrategy
     }
 
     /**
+     * Sample surrounding terrain to build a palette of natural blocks.
+     * Scans a larger radius to understand local geology.
+     */
+    protected TerrainPalette sampleSurroundingTerrain(Level level, BlockPos center, int sampleRadius) {
+        TerrainPalette palette = new TerrainPalette();
+
+        // Sample in a square pattern around the center
+        for (int xOffset = -sampleRadius; xOffset <= sampleRadius; xOffset++) {
+            for (int zOffset = -sampleRadius; zOffset <= sampleRadius; zOffset++) {
+                BlockPos samplePos = center.offset(xOffset, 0, zOffset);
+
+                // Find surface at this position
+                BlockPos surfacePos = com.wcholmes.landscaper.common.util.TerrainUtils.findSurface(level, samplePos);
+
+                if (surfacePos == null) continue;
+
+                // Sample blocks at different depths
+                for (int depth = 0; depth >= -10; depth--) {
+                    BlockPos sampleAt = surfacePos.offset(0, depth, 0);
+                    BlockState state = level.getBlockState(sampleAt);
+                    Block block = state.getBlock();
+
+                    // Skip air, water, and unsafe blocks
+                    if (state.isAir() || block == Blocks.WATER || block == Blocks.LAVA) {
+                        continue;
+                    }
+
+                    // Skip vegetation and structure blocks
+                    if (!NaturalizationConfig.getSafeBlocks().contains(block)) {
+                        continue;
+                    }
+
+                    // Categorize by depth
+                    if (depth == 0) {
+                        palette.addSurfaceBlock(block);
+                    } else if (depth >= -2) {
+                        palette.addSubsurfaceBlock(block);
+                    } else if (depth >= -7) {
+                        palette.addDeepBlock(block);
+                    }
+                    // Ignore blocks deeper than -7 (bedrock layer)
+                }
+            }
+        }
+
+        return palette;
+    }
+
+    /**
      * Determine the natural block to place at a given relative height.
+     * Uses sampled terrain palette when available, falls back to biome palettes.
      * New strata depth system:
-     * - relativeY 0: 1 surface block (biome-specific)
-     * - relativeY -1 to -2: 2 subsurface blocks (biome-specific)
-     * - relativeY -3 to -7: 3-5 randomized deeper blocks (biome-specific transition to stone)
+     * - relativeY 0: 1 surface block (sampled from surrounding terrain)
+     * - relativeY -1 to -2: 2 subsurface blocks (sampled from surrounding terrain)
+     * - relativeY -3 to -7: 5 randomized deeper blocks (sampled with stone gradient)
      * - relativeY < -7: Stone bedrock
      */
     protected BlockState determineNaturalBlock(int relativeY, boolean isUnderwater, NaturalizationMode mode,
-                                               net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome) {
+                                               net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome,
+                                               TerrainPalette sampledPalette) {
         // Air above surface
         if (relativeY > 0) {
             return Blocks.AIR.defaultBlockState();
         }
 
-        // Surface block (relativeY == 0) - biome-specific
+        // Use sampled palette if available and has valid samples
+        boolean useSampledPalette = sampledPalette != null && sampledPalette.hasValidSamples();
+
+        // Surface block (relativeY == 0)
         if (relativeY == 0) {
-            if (isUnderwater) {
-                // Underwater surface - sand/gravel mix
+            if (useSampledPalette) {
+                Block sampledBlock = sampledPalette.getSurfaceBlock();
+                return sampledBlock.defaultBlockState();
+            } else if (isUnderwater) {
+                // Fallback: Underwater surface - sand/gravel mix
                 if (mode.allowsVariation()) {
                     double roll = ThreadLocalRandom.current().nextDouble();
                     if (roll < UNDERWATER_SURF_SAND) return Blocks.SAND.defaultBlockState();
@@ -84,26 +141,51 @@ public abstract class BaseTerrainStrategy implements TerrainModificationStrategy
                     return Blocks.SAND.defaultBlockState();
                 }
             } else {
-                // Land surface - use biome-specific palette
+                // Fallback: Use biome-specific palette
                 Block surfaceBlock = BiomePalette.getSurfaceBlock(biome, mode, mode.allowsVariation());
                 return surfaceBlock.defaultBlockState();
             }
         }
 
-        // Subsurface layer (relativeY -1 to -2) - biome-specific
+        // Subsurface layer (relativeY -1 to -2)
         if (relativeY >= -2) {
-            Block subsurfaceBlock = BiomePalette.getSubsurfaceBlock(biome, relativeY, isUnderwater, mode.allowsVariation());
-            return subsurfaceBlock.defaultBlockState();
+            if (useSampledPalette) {
+                Block sampledBlock = sampledPalette.getSubsurfaceBlock();
+                return sampledBlock.defaultBlockState();
+            } else {
+                // Fallback: Use biome-specific palette
+                Block subsurfaceBlock = BiomePalette.getSubsurfaceBlock(biome, relativeY, isUnderwater, mode.allowsVariation());
+                return subsurfaceBlock.defaultBlockState();
+            }
         }
 
-        // Deep layer (relativeY -3 to -7) - randomized biome-specific transition
+        // Deep layer (relativeY -3 to -7) - randomized with stone gradient
         if (relativeY >= -7) {
-            Block deepBlock = BiomePalette.getDeepLayerBlock(biome, relativeY, isUnderwater, mode.allowsVariation());
-            return deepBlock.defaultBlockState();
+            if (useSampledPalette) {
+                // Use sampled blocks with increasing stone chance as depth increases
+                double stoneChance = 0.20 + (Math.abs(relativeY) - 3) * 0.12;
+                if (ThreadLocalRandom.current().nextDouble() < stoneChance) {
+                    return Blocks.STONE.defaultBlockState();
+                }
+                Block sampledBlock = sampledPalette.getDeepBlock();
+                return sampledBlock.defaultBlockState();
+            } else {
+                // Fallback: Use biome-specific palette
+                Block deepBlock = BiomePalette.getDeepLayerBlock(biome, relativeY, isUnderwater, mode.allowsVariation());
+                return deepBlock.defaultBlockState();
+            }
         }
 
         // Bedrock layer (relativeY < -7) - pure stone
         return Blocks.STONE.defaultBlockState();
+    }
+
+    /**
+     * Legacy method without sampled palette - uses biome palettes only.
+     */
+    protected BlockState determineNaturalBlock(int relativeY, boolean isUnderwater, NaturalizationMode mode,
+                                               net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome) {
+        return determineNaturalBlock(relativeY, isUnderwater, mode, biome, null);
     }
 
     /**

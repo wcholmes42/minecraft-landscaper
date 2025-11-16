@@ -50,6 +50,11 @@ public class NaturalizeStrategy extends BaseTerrainStrategy {
                 center, radius, erosionStrength, roughnessAmount);
         }
 
+        // Sample surrounding terrain to build natural palette
+        int sampleRadius = Math.max(radius + 5, 10); // Sample beyond operation radius
+        TerrainPalette sampledPalette = sampleSurroundingTerrain(level, center, sampleRadius);
+        LOGGER.info("Sampled terrain palette: {}", sampledPalette.getStats());
+
         // Generate world seed for consistent noise
         // Use a deterministic seed based on center position if not ServerLevel
         long worldSeed = 0;
@@ -96,7 +101,7 @@ public class NaturalizeStrategy extends BaseTerrainStrategy {
 
                     // Naturalize this column with height offset
                     int result = naturalizeColumn(level, columnPos, heightOffset, mode, resourcesNeeded,
-                                                 playerPos, playerSettings, center);
+                                                 playerPos, playerSettings, center, sampledPalette);
                     blocksChanged += result;
                 }
             }
@@ -149,7 +154,7 @@ public class NaturalizeStrategy extends BaseTerrainStrategy {
 
                 // Estimate resources for HEIGHT_BELOW blocks (conservative estimate)
                 for (int i = 0; i >= -HEIGHT_BELOW; i--) {
-                    BlockState newState = determineNaturalBlock(i, isUnderwater, mode, biome);
+                    BlockState newState = determineNaturalBlock(i, isUnderwater, mode, biome); // Resource estimation uses fallback
                     Item resourceItem = getResourceItemForBlock(newState);
                     if (resourceItem != null) {
                         resourcesNeeded.merge(resourceItem, 1, Integer::sum);
@@ -266,7 +271,7 @@ public class NaturalizeStrategy extends BaseTerrainStrategy {
     private int naturalizeColumn(Level level, BlockPos pos, int heightOffset, NaturalizationMode mode,
                                   Map<Item, Integer> resourcesNeeded, BlockPos playerPos,
                                   com.wcholmes.landscaper.common.config.PlayerConfig.PlayerSettings playerSettings,
-                                  BlockPos center) {
+                                  BlockPos center, TerrainPalette sampledPalette) {
         int changed = 0;
 
         // Find the surface level
@@ -325,7 +330,7 @@ public class NaturalizeStrategy extends BaseTerrainStrategy {
         for (int i = 0; i >= -HEIGHT_BELOW; i--) {
             BlockPos targetPos = adjustedSurface.offset(0, i, 0);
 
-            BlockState newState = determineNaturalBlock(i, isUnderwater, mode, biome);
+            BlockState newState = determineNaturalBlock(i, isUnderwater, mode, biome, sampledPalette);
 
             level.setBlock(targetPos, newState, BLOCK_UPDATE_FLAG);
             changed++;

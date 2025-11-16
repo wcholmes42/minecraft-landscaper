@@ -44,6 +44,11 @@ public class FillStrategy extends BaseTerrainStrategy {
                 mode.getDisplayName(), center, radius, isCircle ? "circle" : "square", messyEdgeExtension);
         }
 
+        // Sample surrounding terrain to build natural palette
+        int sampleRadius = Math.max(radius + 5, 10);
+        TerrainPalette sampledPalette = sampleSurroundingTerrain(level, center, sampleRadius);
+        LOGGER.info("Sampled terrain palette: {}", sampledPalette.getStats());
+
         // Expand search range if messy edge is enabled
         int searchRadius = messyEdgeExtension > 0 ? effectiveRadius + messyEdgeExtension : effectiveRadius;
 
@@ -76,7 +81,7 @@ public class FillStrategy extends BaseTerrainStrategy {
                     }
 
                     // Process this column with fill logic
-                    int result = fillColumn(level, columnPos, mode, resourcesNeeded, playerPos, playerSettings, center);
+                    int result = fillColumn(level, columnPos, mode, resourcesNeeded, playerPos, playerSettings, center, sampledPalette);
                     blocksChanged += result;
                 }
             }
@@ -135,7 +140,7 @@ public class FillStrategy extends BaseTerrainStrategy {
 
                     // If air or safe block, we'll place something
                     if (currentState.isAir() || NaturalizationConfig.getSafeBlocks().contains(currentState.getBlock())) {
-                        BlockState newState = determineNaturalBlock(i, isUnderwater, mode, biome);
+                        BlockState newState = determineNaturalBlock(i, isUnderwater, mode, biome); // Resource estimation uses fallback
 
                         if (!currentState.is(newState.getBlock())) {
                             Item resourceItem = getResourceItemForBlock(newState);
@@ -154,7 +159,7 @@ public class FillStrategy extends BaseTerrainStrategy {
      */
     private int fillColumn(Level level, BlockPos pos, NaturalizationMode mode, Map<Item, Integer> resourcesNeeded,
                            BlockPos playerPos, com.wcholmes.landscaper.common.config.PlayerConfig.PlayerSettings playerSettings,
-                           BlockPos center) {
+                           BlockPos center, TerrainPalette sampledPalette) {
         int changed = 0;
 
         // Find the surface level
@@ -232,7 +237,7 @@ public class FillStrategy extends BaseTerrainStrategy {
                                            currentState.getBlock() instanceof net.minecraft.world.level.block.BushBlock));
 
             if (shouldFill) {
-                BlockState newState = determineNaturalBlock(i, isUnderwater, mode, biome);
+                BlockState newState = determineNaturalBlock(i, isUnderwater, mode, biome, sampledPalette);
 
                 // Place the block
                 level.setBlock(targetPos, newState, BLOCK_UPDATE_FLAG);
