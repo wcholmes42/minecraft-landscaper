@@ -101,9 +101,9 @@ public class IntelligentNaturalizeStrategy {
 
             // Apply height changes with profile-based blocks
             if (heightDiff > 0) {
-                // Build up using subsurface blocks
+                // Build up using CONSISTENCY-AWARE subsurface blocks
                 for (int y = 0; y < heightDiff; y++) {
-                    Block block = profile.getWeightedRandomSubsurfaceBlock();
+                    Block block = profile.getConsistencyAwareSubsurfaceBlock();
                     level.setBlock(surfacePos.above(y + 1), block.defaultBlockState(), 3);
                     blocksChanged++;
                 }
@@ -123,9 +123,9 @@ public class IntelligentNaturalizeStrategy {
             level.setBlock(newSurface, surfaceBlock.defaultBlockState(), 3);
             blocksChanged++;
 
-            // SUBSURFACE LAYERS - Use subsurface palette
+            // SUBSURFACE LAYERS - Use CONSISTENCY-AWARE subsurface (stone mountains stay stone!)
             for (int y = 1; y <= 5; y++) {
-                Block block = profile.getWeightedRandomSubsurfaceBlock();
+                Block block = profile.getConsistencyAwareSubsurfaceBlock();
                 level.setBlock(newSurface.below(y), block.defaultBlockState(), 3);
                 blocksChanged++;
             }
@@ -331,8 +331,8 @@ public class IntelligentNaturalizeStrategy {
 
                 // Found air with solid block above = overhang/floating block
                 if (state.isAir() && !above.isAir() && above.getBlock() != Blocks.WATER) {
-                    // Fill with appropriate subsurface block
-                    Block fillBlock = profile.getWeightedRandomSubsurfaceBlock();
+                    // Fill with CONSISTENCY-AWARE subsurface block (stone mountains get stone!)
+                    Block fillBlock = profile.getConsistencyAwareSubsurfaceBlock();
                     level.setBlock(checkPos, fillBlock.defaultBlockState(), 3);
                     blocksFilled++;
                 }

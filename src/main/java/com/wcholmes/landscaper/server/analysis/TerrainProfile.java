@@ -166,6 +166,43 @@ public class TerrainProfile {
         return getWeightedRandom(subsurfaceBlockPalette, Blocks.DIRT);
     }
 
+    /**
+     * Get CONSISTENCY-AWARE subsurface block:
+     * - Very homogeneous stone surface → use stone for subsurface too
+     * - Very homogeneous grass → use dirt
+     * - Diverse → use weighted random
+     */
+    public Block getConsistencyAwareSubsurfaceBlock() {
+        if (isVeryHomogeneous()) {
+            // Match subsurface to dominant surface block
+            Block dominant = getDominantSurfaceBlock();
+
+            // Stone-like surfaces → stone subsurface
+            if (dominant == Blocks.STONE || dominant == Blocks.COBBLESTONE ||
+                dominant == Blocks.ANDESITE || dominant == Blocks.GRANITE ||
+                dominant == Blocks.DIORITE || dominant == Blocks.DEEPSLATE) {
+                return Blocks.STONE;
+            }
+
+            // Grass/dirt surfaces → dirt subsurface
+            if (dominant == Blocks.GRASS_BLOCK || dominant == Blocks.DIRT ||
+                dominant == Blocks.PODZOL || dominant == Blocks.COARSE_DIRT) {
+                return Blocks.DIRT;
+            }
+
+            // Sand surfaces → sand/sandstone subsurface
+            if (dominant == Blocks.SAND) {
+                return Blocks.SANDSTONE;
+            }
+
+            // Default: use dominant block or dirt
+            return dominant;
+        } else {
+            // Diverse area - use weighted random
+            return getWeightedRandomSubsurfaceBlock();
+        }
+    }
+
     private Block getWeightedRandom(Map<Block, Integer> palette, Block defaultBlock) {
         int totalWeight = palette.values().stream().mapToInt(Integer::intValue).sum();
         if (totalWeight == 0) return defaultBlock;
