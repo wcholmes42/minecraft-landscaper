@@ -51,9 +51,14 @@ public class NaturalizeStrategy extends BaseTerrainStrategy {
         }
 
         // Sample surrounding terrain to build natural palette
-        int sampleRadius = Math.max(radius + 5, 10); // Sample beyond operation radius
+        int sampleRadius = Math.min(radius + 3, 8); // Sample close to operation area for better matching
         TerrainPalette sampledPalette = sampleSurroundingTerrain(level, center, sampleRadius);
-        LOGGER.info("Sampled terrain palette: {}", sampledPalette.getStats());
+        LOGGER.info("Sampled terrain palette: {} - Valid: {}", sampledPalette.getStats(), sampledPalette.hasValidSamples());
+        if (sampledPalette.hasValidSamples()) {
+            LOGGER.info("Using sampled palette: {}", sampledPalette.getDetailedBreakdown());
+        } else {
+            LOGGER.warn("Insufficient samples, falling back to biome palettes");
+        }
 
         // Generate world seed for consistent noise
         // Use a deterministic seed based on center position if not ServerLevel

@@ -101,6 +101,23 @@ public class TerrainPalette {
      * Check if palette has enough samples to be reliable.
      */
     public boolean hasValidSamples() {
-        return surfaceTotal >= 10 && subsurfaceTotal >= 10 && deepTotal >= 10;
+        return surfaceTotal >= 5 && subsurfaceTotal >= 5 && deepTotal >= 5;
+    }
+
+    /**
+     * Get detailed breakdown of sampled blocks for debugging.
+     */
+    public String getDetailedBreakdown() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("\nSurface blocks: ");
+        surfaceBlocks.forEach((block, count) ->
+            sb.append(block.getDescriptionId()).append("=").append(count).append(" "));
+        sb.append("\nSubsurface blocks: ");
+        subsurfaceBlocks.forEach((block, count) ->
+            sb.append(block.getDescriptionId()).append("=").append(count).append(" "));
+        sb.append("\nDeep blocks: ");
+        deepBlocks.forEach((block, count) ->
+            sb.append(block.getDescriptionId()).append("=").append(count).append(" "));
+        return sb.toString();
     }
 }

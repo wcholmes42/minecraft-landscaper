@@ -45,9 +45,9 @@ public class FillStrategy extends BaseTerrainStrategy {
         }
 
         // Sample surrounding terrain to build natural palette
-        int sampleRadius = Math.max(radius + 5, 10);
+        int sampleRadius = Math.min(radius + 3, 8);
         TerrainPalette sampledPalette = sampleSurroundingTerrain(level, center, sampleRadius);
-        LOGGER.info("Sampled terrain palette: {}", sampledPalette.getStats());
+        LOGGER.info("Sampled terrain palette: {} - Valid: {}", sampledPalette.getStats(), sampledPalette.hasValidSamples());
 
         // Expand search range if messy edge is enabled
         int searchRadius = messyEdgeExtension > 0 ? effectiveRadius + messyEdgeExtension : effectiveRadius;
