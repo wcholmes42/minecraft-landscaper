@@ -65,34 +65,48 @@ public abstract class BaseTerrainStrategy implements TerrainModificationStrategy
         LOGGER.info("=== TERRAIN SAMPLING DEBUG START ===");
         LOGGER.info("Sample center: {}, radius: {}", center, sampleRadius);
 
-        // Find the actual terrain surface at center (not water surface)
-        BlockPos centerSurface = com.wcholmes.landscaper.common.util.TerrainUtils.findSurface(level, center);
-        if (centerSurface == null) {
-            centerSurface = center;
-            LOGGER.warn("findSurface returned null, using center position: {}", center);
-        }
-        LOGGER.info("Center surface found at: {}", centerSurface);
+        // Check what we're standing in/on
+        BlockState centerState = level.getBlockState(center);
+        LOGGER.info("Center block: {}", centerState.getBlock().getDescriptionId());
 
-        // Check if we're underwater - search down from surface for solid blocks
-        BlockState centerSurfaceState = level.getBlockState(centerSurface);
-        boolean isUnderwater = isUnderwater(level, centerSurface);
-        LOGGER.info("Center surface block: {}, isUnderwater: {}", centerSurfaceState.getBlock().getDescriptionId(), isUnderwater);
+        // Search for solid floor - handle both clicking water and clicking underwater blocks
+        BlockPos targetFloor = center;
+        boolean foundFloor = false;
 
-        // If underwater, find the actual floor
-        BlockPos targetFloor = centerSurface;
-        if (isUnderwater || centerSurfaceState.is(Blocks.WATER)) {
-            LOGGER.info("Underwater detected, searching for solid floor...");
-            // Search down for solid ground
-            for (int y = 0; y >= -20; y--) {
-                BlockPos checkPos = centerSurface.offset(0, y, 0);
+        // If we clicked water or air, search down for floor
+        if (centerState.isAir() || centerState.is(Blocks.WATER) || centerState.is(Blocks.LAVA)) {
+            LOGGER.info("Center is air/water/lava, searching down for solid floor...");
+            for (int y = 0; y >= -30; y--) {
+                BlockPos checkPos = center.offset(0, y, 0);
                 BlockState checkState = level.getBlockState(checkPos);
                 Block checkBlock = checkState.getBlock();
 
                 if (!checkState.isAir() && !checkState.is(Blocks.WATER) && !checkState.is(Blocks.LAVA)) {
                     targetFloor = checkPos;
-                    LOGGER.info("Found floor at Y={}, block: {}", checkPos.getY(), checkBlock.getDescriptionId());
+                    foundFloor = true;
+                    LOGGER.info("Found solid floor at Y={}, block: {}", checkPos.getY(), checkBlock.getDescriptionId());
                     break;
                 }
+            }
+        } else {
+            // We clicked a solid block - use it as the floor
+            targetFloor = center;
+            foundFloor = true;
+            LOGGER.info("Center is solid block, using as floor: {}", centerState.getBlock().getDescriptionId());
+        }
+
+        if (!foundFloor) {
+            LOGGER.error("Could not find solid floor! Using center position.");
+            targetFloor = center;
+        }
+
+        // Determine if this is an underwater environment
+        boolean isUnderwater = false;
+        for (int y = 1; y <= 5; y++) {
+            if (level.getBlockState(targetFloor.offset(0, y, 0)).is(Blocks.WATER)) {
+                isUnderwater = true;
+                LOGGER.info("Water found {} blocks above floor - this is underwater terrain", y);
+                break;
             }
         }
 
