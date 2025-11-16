@@ -114,10 +114,10 @@ public class TerrainAnalyzer {
 
                     // Detect tree logs (indicates trees present)
                     if (isTreeLog(block)) {
-                        // Count corresponding sapling type
+                        // Count corresponding sapling type (1x weight - trees are already dense)
                         Block sapling = getSaplingFromLog(block);
                         if (sapling != null) {
-                            vegetationCounts.merge(sapling, 3, Integer::sum); // Weight trees heavily
+                            vegetationCounts.merge(sapling, 1, Integer::sum);
                         }
                     }
 

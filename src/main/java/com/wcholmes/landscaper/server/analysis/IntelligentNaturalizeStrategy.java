@@ -150,6 +150,9 @@ public class IntelligentNaturalizeStrategy {
 
         // Pass 3: Add vegetation based on profile (skip if at/above snow elevation)
         if (profile.getVegetationDensity() > 0) {
+            // Reduce density by 50% to prevent overload
+            double adjustedDensity = profile.getVegetationDensity() * 0.5;
+
             for (BlockPos pos : positions) {
                 BlockPos surfacePos = TerrainUtils.findSurface(level, pos);
                 if (surfacePos == null) continue;
@@ -159,8 +162,8 @@ public class IntelligentNaturalizeStrategy {
                     continue;
                 }
 
-                // Apply vegetation with sampled density
-                if (ThreadLocalRandom.current().nextDouble() < profile.getVegetationDensity()) {
+                // Apply vegetation with REDUCED density (50% of sample)
+                if (ThreadLocalRandom.current().nextDouble() < adjustedDensity) {
                     Block vegBlock = profile.getWeightedRandomVegetation();
                     if (vegBlock != null) {
                         BlockState surfaceState = level.getBlockState(surfacePos);
