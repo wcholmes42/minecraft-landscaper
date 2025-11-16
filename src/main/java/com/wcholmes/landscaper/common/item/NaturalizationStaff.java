@@ -206,16 +206,8 @@ public class NaturalizationStaff extends Item {
             return InteractionResult.FAIL;
         }
 
-        // Only allow clicking on the TOP face of blocks
-        if (context.getClickedFace() != net.minecraft.core.Direction.UP) {
-            if (player != null) {
-                player.displayClientMessage(
-                    Component.literal("You must click on the top of a block!"),
-                    true // Action bar message
-                );
-            }
-            return InteractionResult.FAIL;
-        }
+        // Allow clicking on any face (top, sides, bottom)
+        // Future: can add mode-specific behavior for cliff faces here
 
         BlockPos clickedPos = context.getClickedPos();
         BlockState clickedBlock = level.getBlockState(clickedPos);
