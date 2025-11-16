@@ -133,8 +133,8 @@ public class LandscaperCommand {
             return 0;
         }
 
-        // ANALYZE surrounding terrain (1 chunk radius = 16 blocks)
-        source.sendSuccess(() -> Component.literal("§6Analyzing surrounding terrain..."), false);
+        // ANALYZE surrounding terrain (3 chunk radius = 48 blocks)
+        source.sendSuccess(() -> Component.literal("§6Analyzing 3-chunk radius (48 blocks)..."), false);
         TerrainProfile profile = TerrainAnalyzer.analyze(level, surfacePos);
 
         // Show analysis results

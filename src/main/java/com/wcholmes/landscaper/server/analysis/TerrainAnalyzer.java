@@ -11,15 +11,17 @@ import net.minecraft.world.level.block.state.BlockState;
 import java.util.*;
 
 /**
- * Analyzes terrain in a chunk (16-block) radius to extract natural characteristics.
+ * Analyzes terrain in a 3-chunk (48-block) radius to extract natural characteristics.
+ * Larger sample area provides better statistical accuracy for terrain replication.
  */
 public class TerrainAnalyzer {
 
-    private static final int CHUNK_RADIUS = 16;
-    private static final int SAMPLE_DENSITY = 2;
+    private static final int CHUNK_RADIUS = 48; // 3 chunks = 48 blocks radius
+    private static final int SAMPLE_DENSITY = 2; // Sample every 2 blocks
 
     /**
      * Analyze terrain around a center position.
+     * Samples 48-block radius (3 chunks) in all directions.
      */
     public static TerrainProfile analyze(Level level, BlockPos center) {
         Map<Block, Integer> surfaceBlockCounts = new HashMap<>();
