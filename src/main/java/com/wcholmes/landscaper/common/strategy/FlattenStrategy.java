@@ -61,6 +61,11 @@ public class FlattenStrategy extends BaseTerrainStrategy {
                 center, targetHeight, radius, maxFlattenHeight);
         }
 
+        // Sample surrounding terrain to build natural palette
+        int sampleRadius = Math.min(radius + 3, 8);
+        TerrainPalette sampledPalette = sampleSurroundingTerrain(level, center, sampleRadius);
+        LOGGER.info("Sampled terrain palette: {} - Valid: {}", sampledPalette.getStats(), sampledPalette.hasValidSamples());
+
         // Expand search range if messy edge is enabled
         int searchRadius = messyEdgeExtension > 0 ? effectiveRadius + messyEdgeExtension : effectiveRadius;
 
@@ -83,7 +88,7 @@ public class FlattenStrategy extends BaseTerrainStrategy {
 
                     // Flatten this column
                     FlattenResult result = flattenColumn(level, columnPos, targetHeight, maxFlattenHeight, mode,
-                                                        resourcesNeeded, playerPos, playerSettings);
+                                                        resourcesNeeded, playerPos, playerSettings, sampledPalette);
                     blocksChanged += result.blocksChanged;
 
                     if (result.heightChange > 0) columnsRaised++;
@@ -137,7 +142,7 @@ public class FlattenStrategy extends BaseTerrainStrategy {
                     for (int y = currentHeight + 1; y <= targetHeight; y++) {
                         BlockState newState;
                         if (y == targetHeight) {
-                            // Surface block
+                            // Surface block - resource estimation uses biome fallback
                             Block surfaceBlock = BiomePalette.getSurfaceBlock(biome, mode, mode.allowsVariation());
                             newState = surfaceBlock.defaultBlockState();
                         } else {
@@ -175,7 +180,8 @@ public class FlattenStrategy extends BaseTerrainStrategy {
     private FlattenResult flattenColumn(Level level, BlockPos pos, int targetHeight, int maxFlattenHeight,
                                        NaturalizationMode mode, Map<Item, Integer> resourcesNeeded,
                                        BlockPos playerPos,
-                                       com.wcholmes.landscaper.common.config.PlayerConfig.PlayerSettings playerSettings) {
+                                       com.wcholmes.landscaper.common.config.PlayerConfig.PlayerSettings playerSettings,
+                                       TerrainPalette sampledPalette) {
         int changed = 0;
 
         // Safety check: Don't modify columns directly under the player
@@ -225,7 +231,9 @@ public class FlattenStrategy extends BaseTerrainStrategy {
 
             // Place surface block at target height
             BlockPos targetPos = new BlockPos(pos.getX(), targetHeight, pos.getZ());
-            Block surfaceBlock = BiomePalette.getSurfaceBlock(biome, mode, mode.allowsVariation());
+            Block surfaceBlock = (sampledPalette != null && sampledPalette.hasValidSamples())
+                ? sampledPalette.getSurfaceBlock()
+                : BiomePalette.getSurfaceBlock(biome, mode, mode.allowsVariation());
             level.setBlock(targetPos, surfaceBlock.defaultBlockState(), BLOCK_UPDATE_FLAG);
             changed++;
 
@@ -241,8 +249,10 @@ public class FlattenStrategy extends BaseTerrainStrategy {
                 BlockState newState;
 
                 if (y == targetHeight) {
-                    // Surface block
-                    Block surfaceBlock = BiomePalette.getSurfaceBlock(biome, mode, mode.allowsVariation());
+                    // Surface block - use sampled palette if available
+                    Block surfaceBlock = (sampledPalette != null && sampledPalette.hasValidSamples())
+                        ? sampledPalette.getSurfaceBlock()
+                        : BiomePalette.getSurfaceBlock(biome, mode, mode.allowsVariation());
                     newState = surfaceBlock.defaultBlockState();
                 } else {
                     // Subsurface (dirt)
@@ -261,7 +271,9 @@ public class FlattenStrategy extends BaseTerrainStrategy {
             BlockPos targetPos = new BlockPos(pos.getX(), targetHeight, pos.getZ());
             BlockState currentState = level.getBlockState(targetPos);
 
-            Block surfaceBlock = BiomePalette.getSurfaceBlock(biome, mode, mode.allowsVariation());
+            Block surfaceBlock = (sampledPalette != null && sampledPalette.hasValidSamples())
+                ? sampledPalette.getSurfaceBlock()
+                : BiomePalette.getSurfaceBlock(biome, mode, mode.allowsVariation());
             BlockState newState = surfaceBlock.defaultBlockState();
 
             if (!currentState.is(newState.getBlock())) {
