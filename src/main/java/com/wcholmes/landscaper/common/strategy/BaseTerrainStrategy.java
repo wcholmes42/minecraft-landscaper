@@ -100,15 +100,42 @@ public abstract class BaseTerrainStrategy implements TerrainModificationStrategy
             targetFloor = center;
         }
 
-        // Determine if this is an underwater environment
+        // Determine if this is an underwater environment - check area around the floor
         boolean isUnderwater = false;
-        for (int y = 1; y <= 5; y++) {
-            if (level.getBlockState(targetFloor.offset(0, y, 0)).is(Blocks.WATER)) {
+        int waterBlocksFound = 0;
+
+        // Check directly above floor
+        for (int y = 0; y <= 10; y++) {
+            BlockPos checkPos = targetFloor.offset(0, y, 0);
+            if (level.getBlockState(checkPos).is(Blocks.WATER)) {
+                waterBlocksFound++;
                 isUnderwater = true;
-                LOGGER.info("Water found {} blocks above floor - this is underwater terrain", y);
+                LOGGER.info("Water found {} blocks above floor", y);
                 break;
             }
         }
+
+        // If no water directly above, check surrounding area for water at same level
+        if (!isUnderwater) {
+            for (int dx = -2; dx <= 2; dx++) {
+                for (int dz = -2; dz <= 2; dz++) {
+                    BlockPos checkPos = targetFloor.offset(dx, 0, dz);
+                    if (level.getBlockState(checkPos).is(Blocks.WATER)) {
+                        waterBlocksFound++;
+                    }
+                    // Also check 1 block above
+                    if (level.getBlockState(checkPos.above()).is(Blocks.WATER)) {
+                        waterBlocksFound++;
+                    }
+                }
+            }
+            if (waterBlocksFound >= 5) {
+                isUnderwater = true;
+                LOGGER.info("Water found nearby ({} blocks) - treating as underwater", waterBlocksFound);
+            }
+        }
+
+        LOGGER.info("Underwater detection: {} (water blocks found: {})", isUnderwater, waterBlocksFound);
 
         int targetY = targetFloor.getY();
         LOGGER.info("TARGET SAMPLING DEPTH: Y={} (underwater={})", targetY, isUnderwater);
