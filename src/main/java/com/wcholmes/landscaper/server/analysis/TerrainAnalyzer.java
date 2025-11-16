@@ -273,9 +273,9 @@ public class TerrainAnalyzer {
     private static Block findNaturalSurfaceNearby(Level level, BlockPos center) {
         Map<Block, Integer> nearbyNaturalBlocks = new HashMap<>();
 
-        // Check 8-block radius for natural surface blocks
-        for (int x = -8; x <= 8; x += 2) {
-            for (int z = -8; z <= 8; z += 2) {
+        // Check CHUNK_RADIUS (48 blocks - 3 chunks) for natural surface blocks
+        for (int x = -CHUNK_RADIUS; x <= CHUNK_RADIUS; x += SAMPLE_DENSITY * 2) {
+            for (int z = -CHUNK_RADIUS; z <= CHUNK_RADIUS; z += SAMPLE_DENSITY * 2) {
                 if (x == 0 && z == 0) continue;
 
                 BlockPos checkPos = center.offset(x, 0, z);
