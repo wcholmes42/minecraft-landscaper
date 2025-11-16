@@ -234,7 +234,7 @@ public class ReplaceStrategy extends BaseTerrainStrategy {
         for (int i = 0; i >= -HEIGHT_BELOW; i--) {
             BlockPos targetPos = surfacePos.offset(0, i, 0);
 
-            BlockState newState = determineNaturalBlock(i, isUnderwater, mode, biome); // Resource estimation uses fallback
+            BlockState newState = determineNaturalBlock(i, isUnderwater, mode, biome, sampledPalette);
 
             // Place the block
             level.setBlock(targetPos, newState, BLOCK_UPDATE_FLAG);
