@@ -217,9 +217,16 @@ public abstract class BaseTerrainStrategy implements TerrainModificationStrategy
 
         // Use sampled palette if available and has valid samples
         if (sampledPalette == null) {
-            LOGGER.error("BUG: sampledPalette is NULL in determineNaturalBlock!");
+            StackTraceElement[] trace = Thread.currentThread().getStackTrace();
+            String caller = trace.length > 3 ? trace[3].toString() : "unknown";
+            LOGGER.error("BUG: sampledPalette is NULL in determineNaturalBlock! Called from: {}", caller);
         } else if (!sampledPalette.hasValidSamples()) {
-            LOGGER.warn("sampledPalette has insufficient samples, using fallback");
+            LOGGER.warn("sampledPalette has insufficient samples ({}), using fallback", sampledPalette.getStats());
+        } else {
+            // Log once that we're using sampled palette
+            if (relativeY == 0) {
+                LOGGER.info("Using SAMPLED palette for block selection");
+            }
         }
         boolean useSampledPalette = sampledPalette != null && sampledPalette.hasValidSamples();
 
