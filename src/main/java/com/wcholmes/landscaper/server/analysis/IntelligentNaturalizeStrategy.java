@@ -18,11 +18,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 /**
  * Intelligent terrain naturalization using analyzed terrain profile.
  * Replicates the natural style of surrounding terrain.
  */
 public class IntelligentNaturalizeStrategy {
+    private static final Logger LOGGER = LogManager.getLogger();
 
     /**
      * Apply intelligent naturalization based on analyzed terrain profile.
@@ -45,8 +49,16 @@ public class IntelligentNaturalizeStrategy {
         // EMERGENCY SAFETY: Skip beach/river entirely until water issue resolved
         if (profile.getWaterType() == TerrainProfile.WaterType.BEACH ||
             profile.getWaterType() == TerrainProfile.WaterType.RIVER) {
+            LOGGER.warn("⚠️  BEACH/RIVER detected at {} - terrain modification ABORTED for safety", center);
+            LOGGER.warn("   Water type: {}, density: {}%", profile.getWaterType(), String.format("%.1f", profile.getWaterDensity() * 100));
             return 0; // ABORT - beaches are broken, skip completely
         }
+
+        LOGGER.info("Starting intelligent naturalization at {} radius={}", center, radius);
+        LOGGER.info("  Profile: consistency={}% homogeneous={} veryHomogeneous={}",
+            String.format("%.0f", profile.getSurfaceConsistency() * 100),
+            profile.isHomogeneous(), profile.isVeryHomogeneous());
+        LOGGER.info("  Dominant block: {}", profile.getDominantSurfaceBlock().getName().getString());
 
         // Get positions to modify
         List<BlockPos> positions = circleShape ?
@@ -185,17 +197,26 @@ public class IntelligentNaturalizeStrategy {
             }
         }
 
+        LOGGER.info("Pass 3 complete (vegetation) - positions processed: {}", positions.size());
+
         // Pass 4: Repair overhangs (fill floating blocks with support)
         int overhangsFilled = repairOverhangs(level, positions, profile);
         blocksChanged += overhangsFilled;
+        LOGGER.info("Pass 4 complete (overhang repair) - filled: {}", overhangsFilled);
 
         // Pass 5: Apply water features (respects water type rules)
         int waterBlocks = WaterFeatureManager.applyWaterFeatures(level, positions, profile);
         blocksChanged += waterBlocks;
+        LOGGER.info("Pass 5 complete (water) - placed: {} (should be 0!)", waterBlocks);
+        if (waterBlocks > 0) {
+            LOGGER.error("❌ WATER WAS PLACED! This should NEVER happen! Count: {}", waterBlocks);
+        }
 
         // Pass 6: Clean up item drops
         AABB bounds = new AABB(surface).inflate(radius + messyEdge);
         level.getEntitiesOfClass(ItemEntity.class, bounds).forEach(ItemEntity::discard);
+
+        LOGGER.info("Naturalization complete! Total blocks changed: {}", blocksChanged);
 
         return blocksChanged;
     }
