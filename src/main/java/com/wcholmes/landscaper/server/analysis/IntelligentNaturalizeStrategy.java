@@ -176,11 +176,15 @@ public class IntelligentNaturalizeStrategy {
             }
         }
 
-        // Pass 4: Apply water features (respects water type rules)
+        // Pass 4: Repair overhangs (fill floating blocks with support)
+        int overhangsFilled = repairOverhangs(level, positions, profile);
+        blocksChanged += overhangsFilled;
+
+        // Pass 5: Apply water features (respects water type rules)
         int waterBlocks = WaterFeatureManager.applyWaterFeatures(level, positions, profile);
         blocksChanged += waterBlocks;
 
-        // Pass 5: Clean up item drops
+        // Pass 6: Clean up item drops
         AABB bounds = new AABB(surface).inflate(radius + messyEdge);
         level.getEntitiesOfClass(ItemEntity.class, bounds).forEach(ItemEntity::discard);
 
@@ -308,4 +312,39 @@ public class IntelligentNaturalizeStrategy {
                block == Blocks.SAND ||
                block == Blocks.MUD;
     }
+
+    /**
+     * Repair overhangs - fill air gaps under solid blocks for natural terrain
+     */
+    private static int repairOverhangs(Level level, List<BlockPos> positions, TerrainProfile profile) {
+        int blocksFilled = 0;
+
+        for (BlockPos pos : positions) {
+            BlockPos surfacePos = TerrainUtils.findSurface(level, pos);
+            if (surfacePos == null) continue;
+
+            // Check downward from surface for air gaps (overhangs)
+            for (int y = 1; y <= 10; y++) {
+                BlockPos checkPos = surfacePos.below(y);
+                BlockState state = level.getBlockState(checkPos);
+                BlockState above = level.getBlockState(checkPos.above());
+
+                // Found air with solid block above = overhang/floating block
+                if (state.isAir() && !above.isAir() && above.getBlock() != Blocks.WATER) {
+                    // Fill with appropriate subsurface block
+                    Block fillBlock = profile.getWeightedRandomSubsurfaceBlock();
+                    level.setBlock(checkPos, fillBlock.defaultBlockState(), 3);
+                    blocksFilled++;
+                }
+
+                // Stop at first solid block (no gaps below this)
+                if (!state.isAir() && state.getBlock() != Blocks.WATER) {
+                    break;
+                }
+            }
+        }
+
+        return blocksFilled;
+    }
 }
+

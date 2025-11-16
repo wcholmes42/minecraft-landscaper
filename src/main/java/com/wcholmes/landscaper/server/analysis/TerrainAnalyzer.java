@@ -79,8 +79,8 @@ public class TerrainAnalyzer {
                     }
                 }
 
-                // Analyze vegetation and snow
-                for (int y = 1; y <= 3; y++) {
+                // Analyze vegetation, snow, and trees
+                for (int y = 1; y <= 10; y++) { // Extended to detect trees
                     BlockState state = level.getBlockState(surface.above(y));
                     Block block = state.getBlock();
 
@@ -88,6 +88,15 @@ public class TerrainAnalyzer {
                     if (block == Blocks.SNOW || block == Blocks.POWDER_SNOW) {
                         hasSnowLayers = true;
                         snowElevations.add(surfaceY);
+                    }
+
+                    // Detect tree logs (indicates trees present)
+                    if (isTreeLog(block)) {
+                        // Count corresponding sapling type
+                        Block sapling = getSaplingFromLog(block);
+                        if (sapling != null) {
+                            vegetationCounts.merge(sapling, 3, Integer::sum); // Weight trees heavily
+                        }
                     }
 
                     if (isVegetation(state)) {
@@ -197,26 +206,28 @@ public class TerrainAnalyzer {
     }
 
     /**
-     * Check if a block is a valid natural surface block (not stone/ore/etc.)
+     * Check if block is a tree log
      */
-    private static boolean isSurfaceBlock(Block block) {
-        // Natural surface blocks that should be on top layer
-        return block == Blocks.GRASS_BLOCK ||
-               block == Blocks.DIRT ||
-               block == Blocks.COARSE_DIRT ||
-               block == Blocks.PODZOL ||
-               block == Blocks.MYCELIUM ||
-               block == Blocks.SAND ||
-               block == Blocks.RED_SAND ||
-               block == Blocks.GRAVEL ||
-               block == Blocks.DIRT_PATH ||
-               block == Blocks.FARMLAND ||
-               block == Blocks.MUD ||
-               block == Blocks.CLAY ||
-               block == Blocks.SNOW_BLOCK ||
-               block == Blocks.SNOW ||
-               block == Blocks.POWDER_SNOW ||
-               block == Blocks.MOSSY_COBBLESTONE; // Jungle/swamp surface
-        // Explicitly EXCLUDE: Stone, ores, cobblestone, deepslate, etc.
+    private static boolean isTreeLog(Block block) {
+        return block == Blocks.OAK_LOG || block == Blocks.BIRCH_LOG ||
+               block == Blocks.SPRUCE_LOG || block == Blocks.JUNGLE_LOG ||
+               block == Blocks.ACACIA_LOG || block == Blocks.DARK_OAK_LOG ||
+               block == Blocks.CHERRY_LOG || block == Blocks.MANGROVE_LOG;
+    }
+
+    /**
+     * Get sapling type from log type
+     */
+    private static Block getSaplingFromLog(Block log) {
+        if (log == Blocks.OAK_LOG) return Blocks.OAK_SAPLING;
+        if (log == Blocks.BIRCH_LOG) return Blocks.BIRCH_SAPLING;
+        if (log == Blocks.SPRUCE_LOG) return Blocks.SPRUCE_SAPLING;
+        if (log == Blocks.JUNGLE_LOG) return Blocks.JUNGLE_SAPLING;
+        if (log == Blocks.ACACIA_LOG) return Blocks.ACACIA_SAPLING;
+        if (log == Blocks.DARK_OAK_LOG) return Blocks.DARK_OAK_SAPLING;
+        if (log == Blocks.CHERRY_LOG) return Blocks.CHERRY_SAPLING;
+        if (log == Blocks.MANGROVE_PROPAGULE) return Blocks.MANGROVE_PROPAGULE;
+        return null;
     }
 }
+
