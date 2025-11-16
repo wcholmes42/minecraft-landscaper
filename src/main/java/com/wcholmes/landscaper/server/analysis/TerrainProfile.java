@@ -11,8 +11,9 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class TerrainProfile {
 
-    private final Map<Block, Integer> blockPalette;
-    private final Map<Block, Double> blockFrequency;
+    private final Map<Block, Integer> surfaceBlockPalette;
+    private final Map<Block, Integer> subsurfaceBlockPalette;
+    private final Map<Block, Double> surfaceBlockFrequency;
     private final Map<Block, Integer> vegetationPalette;
     private final double vegetationDensity;
     private final int minY;
@@ -30,7 +31,8 @@ public class TerrainProfile {
         NONE, BEACH, RIVER, LAKE, SWAMP
     }
 
-    public TerrainProfile(Map<Block, Integer> blockPalette,
+    public TerrainProfile(Map<Block, Integer> surfaceBlockPalette,
+                         Map<Block, Integer> subsurfaceBlockPalette,
                          Map<Block, Integer> vegetationPalette,
                          double vegetationDensity,
                          int minY, int maxY, int averageY, int medianY,
@@ -40,7 +42,8 @@ public class TerrainProfile {
                          WaterType waterType,
                          double waterDensity,
                          int waterLevel) {
-        this.blockPalette = blockPalette;
+        this.surfaceBlockPalette = surfaceBlockPalette;
+        this.subsurfaceBlockPalette = subsurfaceBlockPalette;
         this.vegetationPalette = vegetationPalette;
         this.vegetationDensity = vegetationDensity;
         this.minY = minY;
@@ -54,19 +57,21 @@ public class TerrainProfile {
         this.waterDensity = waterDensity;
         this.waterLevel = waterLevel;
 
-        // Calculate normalized frequencies
-        this.blockFrequency = new HashMap<>();
-        int totalBlocks = blockPalette.values().stream().mapToInt(Integer::intValue).sum();
-        if (totalBlocks > 0) {
-            for (Map.Entry<Block, Integer> entry : blockPalette.entrySet()) {
-                blockFrequency.put(entry.getKey(), (double) entry.getValue() / totalBlocks);
+        // Calculate normalized surface block frequencies
+        this.surfaceBlockFrequency = new HashMap<>();
+        int totalSurfaceBlocks = surfaceBlockPalette.values().stream().mapToInt(Integer::intValue).sum();
+        if (totalSurfaceBlocks > 0) {
+            for (Map.Entry<Block, Integer> entry : surfaceBlockPalette.entrySet()) {
+                surfaceBlockFrequency.put(entry.getKey(), (double) entry.getValue() / totalSurfaceBlocks);
             }
         }
     }
 
     // Getters
-    public Map<Block, Integer> getBlockPalette() { return blockPalette; }
-    public Map<Block, Double> getBlockFrequency() { return blockFrequency; }
+    public Map<Block, Integer> getSurfaceBlockPalette() { return surfaceBlockPalette; }
+    public Map<Block, Integer> getSubsurfaceBlockPalette() { return subsurfaceBlockPalette; }
+    public Map<Block, Integer> getBlockPalette() { return surfaceBlockPalette; } // For compatibility
+    public Map<Block, Double> getBlockFrequency() { return surfaceBlockFrequency; }
     public Map<Block, Integer> getVegetationPalette() { return vegetationPalette; }
     public double getVegetationDensity() { return vegetationDensity; }
     public int getMinY() { return minY; }
@@ -81,8 +86,8 @@ public class TerrainProfile {
     public double getWaterDensity() { return waterDensity; }
     public int getWaterLevel() { return waterLevel; }
 
-    public Block getDominantBlock() {
-        return blockPalette.entrySet().stream()
+    public Block getDominantSurfaceBlock() {
+        return surfaceBlockPalette.entrySet().stream()
             .filter(e -> !e.getKey().getName().getString().contains("air") &&
                         !e.getKey().getName().getString().contains("water"))
             .max(Map.Entry.comparingByValue())
@@ -98,23 +103,34 @@ public class TerrainProfile {
     }
 
     /**
-     * Get weighted random block from palette (for terrain generation)
+     * Get weighted random SURFACE block (for top layer)
      */
-    public Block getWeightedRandomBlock() {
-        int totalWeight = blockPalette.values().stream().mapToInt(Integer::intValue).sum();
-        if (totalWeight == 0) return Blocks.GRASS_BLOCK;
+    public Block getWeightedRandomSurfaceBlock() {
+        return getWeightedRandom(surfaceBlockPalette, Blocks.GRASS_BLOCK);
+    }
+
+    /**
+     * Get weighted random SUBSURFACE block (for layers below)
+     */
+    public Block getWeightedRandomSubsurfaceBlock() {
+        return getWeightedRandom(subsurfaceBlockPalette, Blocks.DIRT);
+    }
+
+    private Block getWeightedRandom(Map<Block, Integer> palette, Block defaultBlock) {
+        int totalWeight = palette.values().stream().mapToInt(Integer::intValue).sum();
+        if (totalWeight == 0) return defaultBlock;
 
         int random = ThreadLocalRandom.current().nextInt(totalWeight);
         int cumulative = 0;
 
-        for (Map.Entry<Block, Integer> entry : blockPalette.entrySet()) {
+        for (Map.Entry<Block, Integer> entry : palette.entrySet()) {
             cumulative += entry.getValue();
             if (random < cumulative) {
                 return entry.getKey();
             }
         }
 
-        return blockPalette.keySet().iterator().next();
+        return palette.keySet().iterator().next();
     }
 
     public Block getWeightedRandomVegetation() {
@@ -139,8 +155,8 @@ public class TerrainProfile {
     @Override
     public String toString() {
         return String.format(
-            "TerrainProfile{blocks=%d, veg=%d, density=%.1f%%, height=%d-%d(avg=%d), smooth=%.2f, water=%s(%.1f%%)}",
-            blockPalette.size(), vegetationPalette.size(), vegetationDensity * 100,
+            "TerrainProfile{surface=%d, subsurface=%d, veg=%d, density=%.1f%%, height=%d-%d(avg=%d), smooth=%.2f, water=%s(%.1f%%)}",
+            surfaceBlockPalette.size(), subsurfaceBlockPalette.size(), vegetationPalette.size(), vegetationDensity * 100,
             minY, maxY, averageY, smoothness, waterType, waterDensity * 100
         );
     }

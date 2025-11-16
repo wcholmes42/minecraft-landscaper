@@ -77,9 +77,9 @@ public class IntelligentNaturalizeStrategy {
 
             // Apply height changes with profile-based blocks
             if (heightDiff > 0) {
-                // Build up
+                // Build up using subsurface blocks
                 for (int y = 0; y < heightDiff; y++) {
-                    Block block = profile.getWeightedRandomBlock();
+                    Block block = profile.getWeightedRandomSubsurfaceBlock();
                     level.setBlock(surfacePos.above(y + 1), block.defaultBlockState(), 3);
                     blocksChanged++;
                 }
@@ -91,10 +91,17 @@ public class IntelligentNaturalizeStrategy {
                 }
             }
 
-            // Place subsurface layers with sampled blocks
+            // Place new surface based on sampled area
             BlockPos newSurface = surfacePos.above(Math.max(0, heightDiff));
+
+            // SURFACE LAYER - Use surface block palette for natural consistency
+            Block surfaceBlock = profile.getWeightedRandomSurfaceBlock();
+            level.setBlock(newSurface, surfaceBlock.defaultBlockState(), 3);
+            blocksChanged++;
+
+            // SUBSURFACE LAYERS - Use subsurface palette
             for (int y = 1; y <= 5; y++) {
-                Block block = profile.getWeightedRandomBlock();
+                Block block = profile.getWeightedRandomSubsurfaceBlock();
                 level.setBlock(newSurface.below(y), block.defaultBlockState(), 3);
                 blocksChanged++;
             }

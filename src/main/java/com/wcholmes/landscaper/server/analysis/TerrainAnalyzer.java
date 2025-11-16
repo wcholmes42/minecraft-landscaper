@@ -22,7 +22,8 @@ public class TerrainAnalyzer {
      * Analyze terrain around a center position.
      */
     public static TerrainProfile analyze(Level level, BlockPos center) {
-        Map<Block, Integer> blockCounts = new HashMap<>();
+        Map<Block, Integer> surfaceBlockCounts = new HashMap<>();
+        Map<Block, Integer> subsurfaceBlockCounts = new HashMap<>();
         Map<Block, Integer> vegetationCounts = new HashMap<>();
         List<Integer> heights = new ArrayList<>();
         Map<Integer, Integer> heightDistribution = new HashMap<>();
@@ -44,14 +45,20 @@ public class TerrainAnalyzer {
                 heights.add(surfaceY);
                 heightDistribution.merge(surfaceY, 1, Integer::sum);
 
-                // Analyze subsurface blocks
-                for (int y = 0; y < 10; y++) {
+                // Sample SURFACE block (y=0) - the top layer
+                BlockState surfaceState = level.getBlockState(surface);
+                if (!surfaceState.isAir()) {
+                    surfaceBlockCounts.merge(surfaceState.getBlock(), 1, Integer::sum);
+                }
+
+                // Sample SUBSURFACE blocks (y=1-9) - layers below
+                for (int y = 1; y < 10; y++) {
                     BlockPos blockPos = surface.below(y);
                     BlockState state = level.getBlockState(blockPos);
                     Block block = state.getBlock();
 
                     if (!state.isAir()) {
-                        blockCounts.merge(block, 1, Integer::sum);
+                        subsurfaceBlockCounts.merge(block, 1, Integer::sum);
                         totalBlocks++;
 
                         if (block == Blocks.WATER) {
@@ -100,7 +107,7 @@ public class TerrainAnalyzer {
         double waterDensity = totalBlocks > 0 ? (double) waterBlockCount / totalBlocks : 0.0;
 
         return new TerrainProfile(
-            blockCounts, vegetationCounts, vegetationDensity,
+            surfaceBlockCounts, subsurfaceBlockCounts, vegetationCounts, vegetationDensity,
             minY, maxY, averageY, medianY, heightDistribution,
             smoothness, avgSlope, waterType, waterDensity, averageY
         );
