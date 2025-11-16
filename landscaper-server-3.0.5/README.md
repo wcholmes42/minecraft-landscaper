@@ -1,7 +1,5 @@
 # Landscaper Mod - Deployment Instructions
 
-## For Server Admin ("The Boy")
-
 ### Files Needed
 
 **Location:** `D:\code\minecraft\Landscaper\build\libs\`

@@ -10,16 +10,18 @@ NC='\033[0m' # No Color
 # Check if version bump type provided
 if [ -z "$1" ]; then
     echo -e "${RED}Error: Version bump type required${NC}"
-    echo "Usage: ./release.sh <major|minor|patch>"
+    echo "Usage: ./release.sh <major|minor|patch> [commit message]"
     echo ""
     echo "Examples:"
-    echo "  ./release.sh major   # 2.0.0 -> 3.0.0"
-    echo "  ./release.sh minor   # 2.0.0 -> 2.1.0"
-    echo "  ./release.sh patch   # 2.0.0 -> 2.0.1"
+    echo "  ./release.sh patch                    # 2.0.0 -> 2.0.1"
+    echo "  ./release.sh patch 'Fix ruby_block'   # With custom message"
+    echo "  ./release.sh minor                    # 2.0.0 -> 2.1.0"
+    echo "  ./release.sh major                    # 2.0.0 -> 3.0.0"
     exit 1
 fi
 
 BUMP_TYPE="$1"
+COMMIT_MSG="${2:-}"
 
 # Validate bump type
 if [[ ! "$BUMP_TYPE" =~ ^(major|minor|patch)$ ]]; then
@@ -64,14 +66,28 @@ echo -e "${GREEN}New version: ${NEW_VERSION}${NC}"
 echo -e "${YELLOW}Updating gradle.properties...${NC}"
 sed -i "s/^mod_version=.*$/mod_version=${NEW_VERSION}/" gradle.properties
 
-# Commit changes
-echo -e "${YELLOW}Committing changes...${NC}"
-git add gradle.properties
-git commit -m "Update to v${NEW_VERSION}
+# Commit ALL changes (not just version files)
+echo -e "${YELLOW}Committing all changes...${NC}"
+git add -A
+
+# Build commit message
+if [ -n "$COMMIT_MSG" ]; then
+    FULL_MSG="$COMMIT_MSG
+
+Update to v${NEW_VERSION}
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
+else
+    FULL_MSG="Update to v${NEW_VERSION}
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+fi
+
+git commit -m "$FULL_MSG"
 
 # Create and push tag
 echo -e "${YELLOW}Creating tag v${NEW_VERSION}...${NC}"
