@@ -32,7 +32,7 @@ public class WaterFeatureManager {
         Set<BlockPos> existingWater = findExistingWater(level, positions);
 
         return switch (profile.getWaterType()) {
-            case BEACH, RIVER -> extendExistingWaterContained(level, positions, existingWater, profile);
+            case BEACH, RIVER -> 0; // NEVER place water in beach/river - too risky
             case LAKE, SWAMP -> createContainedLakes(level, positions, existingWater, profile);
             case NONE -> 0;
         };
@@ -116,8 +116,8 @@ public class WaterFeatureManager {
             waterPlaced += extendExistingWaterContained(level, positions, existingWater, profile);
         }
 
-        // Create new ponds using aquifer-inspired algorithm
-        if (profile.getWaterDensity() > 0.15) { // Only if significant water presence
+        // Create new ponds using aquifer-inspired algorithm (VERY strict threshold)
+        if (profile.getWaterDensity() > 0.25) { // Only if VERY significant water presence
             waterPlaced += createAquiferLakes(level, positions, existingWater, profile);
         }
 
