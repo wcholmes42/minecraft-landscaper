@@ -49,15 +49,15 @@ public class IntelligentNaturalizeStrategy {
 
         int blocksChanged = 0;
 
-        // Pass 1: Clear vegetation (but preserve snow!)
+        // Pass 1: Clear vegetation AND WATER (preserve snow only!)
         for (BlockPos pos : positions) {
             BlockPos surfacePos = TerrainUtils.findSurface(level, pos);
             if (surfacePos == null) continue;
 
-            // Clear vegetation above (EXCEPT snow)
-            for (int y = 1; y <= 3; y++) {
-                BlockPos vegPos = surfacePos.above(y);
-                BlockState state = level.getBlockState(vegPos);
+            // Clear vegetation and WATER above surface (EXCEPT snow)
+            for (int y = 0; y <= 3; y++) {
+                BlockPos clearPos = surfacePos.above(y);
+                BlockState state = level.getBlockState(clearPos);
                 Block block = state.getBlock();
 
                 // Don't remove snow layers!
@@ -65,8 +65,9 @@ public class IntelligentNaturalizeStrategy {
                     continue;
                 }
 
-                if (!state.isAir() && isVegetation(state)) {
-                    level.setBlock(vegPos, Blocks.AIR.defaultBlockState(), 3);
+                // REMOVE water and vegetation
+                if (block == Blocks.WATER || (!state.isAir() && isVegetation(state))) {
+                    level.setBlock(clearPos, Blocks.AIR.defaultBlockState(), 3);
                 }
             }
         }
