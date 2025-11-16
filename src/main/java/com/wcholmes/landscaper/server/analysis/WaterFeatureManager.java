@@ -31,11 +31,16 @@ public class WaterFeatureManager {
 
         Set<BlockPos> existingWater = findExistingWater(level, positions);
 
+        // EMERGENCY: Disable ALL water placement until containment fixed
+        return 0;
+
+        /*
         return switch (profile.getWaterType()) {
-            case BEACH, RIVER -> 0; // NEVER place water in beach/river - too risky
+            case BEACH, RIVER -> 0;
             case LAKE, SWAMP -> createContainedLakes(level, positions, existingWater, profile);
             case NONE -> 0;
         };
+        */
     }
 
     private static Set<BlockPos> findExistingWater(Level level, List<BlockPos> positions) {
