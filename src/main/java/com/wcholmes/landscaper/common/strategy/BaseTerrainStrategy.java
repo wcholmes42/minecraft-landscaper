@@ -222,6 +222,7 @@ public abstract class BaseTerrainStrategy implements TerrainModificationStrategy
         if (relativeY == 0) {
             if (useSampledPalette) {
                 Block sampledBlock = sampledPalette.getSurfaceBlock();
+                LOGGER.info("BLOCK PLACEMENT: relativeY=0, using SAMPLED palette, selected: {}", sampledBlock.getDescriptionId());
                 return sampledBlock.defaultBlockState();
             } else if (isUnderwater) {
                 // Fallback: Underwater surface - sand/gravel mix
@@ -237,6 +238,8 @@ public abstract class BaseTerrainStrategy implements TerrainModificationStrategy
             } else {
                 // Fallback: Use biome-specific palette
                 Block surfaceBlock = BiomePalette.getSurfaceBlock(biome, mode, mode.allowsVariation());
+                LOGGER.warn("BLOCK PLACEMENT: relativeY=0, using BIOME FALLBACK, selected: {}, biome: {}",
+                    surfaceBlock.getDescriptionId(), biome.unwrapKey().map(k -> k.location().toString()).orElse("unknown"));
                 return surfaceBlock.defaultBlockState();
             }
         }
@@ -245,6 +248,9 @@ public abstract class BaseTerrainStrategy implements TerrainModificationStrategy
         if (relativeY >= -2) {
             if (useSampledPalette) {
                 Block sampledBlock = sampledPalette.getSubsurfaceBlock();
+                if (relativeY == -1) {
+                    LOGGER.info("BLOCK PLACEMENT: relativeY=-1, using SAMPLED palette, selected: {}", sampledBlock.getDescriptionId());
+                }
                 return sampledBlock.defaultBlockState();
             } else {
                 // Fallback: Use biome-specific palette
