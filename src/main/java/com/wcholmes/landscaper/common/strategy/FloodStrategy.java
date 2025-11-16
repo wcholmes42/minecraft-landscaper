@@ -47,7 +47,8 @@ public class FloodStrategy extends BaseTerrainStrategy {
             return 0;
         }
 
-        int waterLevel = targetSurfacePos.getY();
+        // Flood one block ABOVE the surface (so water sits on top, not replacing ground)
+        int waterLevel = targetSurfacePos.getY() + 1;
 
         if (LOGGER.isDebugEnabled()) {
             LOGGER.debug("Starting FLOOD at {} with waterLevel={}, radius={}",
