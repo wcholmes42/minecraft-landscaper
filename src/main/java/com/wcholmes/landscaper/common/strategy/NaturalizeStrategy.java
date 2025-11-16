@@ -14,6 +14,8 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
@@ -32,6 +34,9 @@ public class NaturalizeStrategy extends BaseTerrainStrategy {
         int blocksChanged = 0;
         int landColumns = 0;
         int underwaterColumns = 0;
+
+        // Track changes for undo
+        List<com.wcholmes.landscaper.common.undo.UndoManager.BlockChange> undoChanges = new ArrayList<>();
 
         // Use player-specific settings or fall back to global config
         int radius = playerSettings != null ? playerSettings.radius : NaturalizationConfig.getRadius();
@@ -106,7 +111,7 @@ public class NaturalizeStrategy extends BaseTerrainStrategy {
 
                     // Naturalize this column with height offset
                     int result = naturalizeColumn(level, columnPos, heightOffset, mode, resourcesNeeded,
-                                                 playerPos, playerSettings, center, sampledPalette);
+                                                 playerPos, playerSettings, center, sampledPalette, undoChanges);
                     blocksChanged += result;
                 }
             }
@@ -276,7 +281,8 @@ public class NaturalizeStrategy extends BaseTerrainStrategy {
     private int naturalizeColumn(Level level, BlockPos pos, int heightOffset, NaturalizationMode mode,
                                   Map<Item, Integer> resourcesNeeded, BlockPos playerPos,
                                   com.wcholmes.landscaper.common.config.PlayerConfig.PlayerSettings playerSettings,
-                                  BlockPos center, TerrainPalette sampledPalette) {
+                                  BlockPos center, TerrainPalette sampledPalette,
+                                  List<com.wcholmes.landscaper.common.undo.UndoManager.BlockChange> undoChanges) {
         int changed = 0;
 
         // Find the surface level
@@ -315,6 +321,8 @@ public class NaturalizeStrategy extends BaseTerrainStrategy {
                 currentState.is(Blocks.SEAGRASS) || currentState.is(Blocks.TALL_SEAGRASS);
 
             if (isVegetation) {
+                BlockState oldState = level.getBlockState(targetPos);
+                undoChanges.add(new com.wcholmes.landscaper.common.undo.UndoManager.BlockChange(targetPos, oldState));
                 level.setBlock(targetPos, Blocks.AIR.defaultBlockState(), BLOCK_UPDATE_FLAG);
             }
         }
@@ -336,6 +344,10 @@ public class NaturalizeStrategy extends BaseTerrainStrategy {
             BlockPos targetPos = adjustedSurface.offset(0, i, 0);
 
             BlockState newState = determineNaturalBlock(i, isUnderwater, mode, biome, sampledPalette);
+
+            // Track for undo before changing
+            BlockState oldState = level.getBlockState(targetPos);
+            undoChanges.add(new com.wcholmes.landscaper.common.undo.UndoManager.BlockChange(targetPos, oldState));
 
             level.setBlock(targetPos, newState, BLOCK_UPDATE_FLAG);
             changed++;
