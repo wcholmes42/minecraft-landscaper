@@ -68,6 +68,51 @@ public class AccuracyValidator {
     }
 
     /**
+     * Compare sample area palette with result area palette
+     */
+    public static String compareBlockPalettes(TerrainProfile sampleProfile, Snapshot resultSnapshot) {
+        StringBuilder comparison = new StringBuilder();
+        comparison.append("§6═══ Block Palette Comparison ═══\n");
+        comparison.append("§7Sample (3-chunk) vs Result (target area)\n\n");
+
+        Map<Block, Integer> samplePalette = sampleProfile.getSurfaceBlockPalette();
+        Map<Block, Integer> resultPalette = resultSnapshot.surfaceBlocks;
+
+        // Get all unique blocks from both
+        Set<Block> allBlocks = new HashSet<>();
+        allBlocks.addAll(samplePalette.keySet());
+        allBlocks.addAll(resultPalette.keySet());
+
+        // Calculate totals
+        int sampleTotal = samplePalette.values().stream().mapToInt(Integer::intValue).sum();
+        int resultTotal = resultPalette.values().stream().mapToInt(Integer::intValue).sum();
+
+        for (Block block : allBlocks) {
+            int sampleCount = samplePalette.getOrDefault(block, 0);
+            int resultCount = resultPalette.getOrDefault(block, 0);
+
+            double samplePercent = sampleTotal > 0 ? (double) sampleCount / sampleTotal * 100 : 0;
+            double resultPercent = resultTotal > 0 ? (double) resultCount / resultTotal * 100 : 0;
+            double diff = resultPercent - samplePercent;
+
+            String diffStr;
+            if (Math.abs(diff) < 1) {
+                diffStr = "§a≈"; // Nearly identical
+            } else if (diff > 0) {
+                diffStr = String.format("§c+%.1f%%", diff);
+            } else {
+                diffStr = String.format("§e%.1f%%", diff);
+            }
+
+            String blockName = block.getName().getString().replace("block.minecraft.", "");
+            comparison.append(String.format("§7%s: §e%.1f%% §7→ §e%.1f%% §7(%s§7)\n",
+                blockName, samplePercent, resultPercent, diffStr));
+        }
+
+        return comparison.toString();
+    }
+
+    /**
      * Compare before/after and calculate accuracy metrics
      */
     public static ValidationResult validate(Snapshot before, Snapshot after, TerrainProfile expectedProfile) {

@@ -172,6 +172,9 @@ public class LandscaperCommand {
         AccuracyValidator.Snapshot after = AccuracyValidator.captureSnapshot(level, targetPositions);
         AccuracyValidator.ValidationResult validation = AccuracyValidator.validate(before, after, profile);
 
+        // Generate detailed block palette comparison
+        String paletteComparison = AccuracyValidator.compareBlockPalettes(profile, after);
+
         source.sendSuccess(() -> Component.literal(
             "§a✓ Complete! §6Modified §e" + blocksChanged + " §6blocks\n" +
             "§7Accuracy: " + validation.getGrade() + " §e" + String.format("%.0f%%", validation.overallScore * 100) + "\n" +
@@ -182,6 +185,9 @@ public class LandscaperCommand {
                 validation.beforeRange + " → " + validation.afterRange + " range)\n" +
             "§7  Block Match: " + (validation.blockMatch ? "§a✓" : "§c✗")
         ), false);
+
+        // Print detailed block comparison
+        source.sendSuccess(() -> Component.literal(paletteComparison), false);
 
         return 1;
     }
