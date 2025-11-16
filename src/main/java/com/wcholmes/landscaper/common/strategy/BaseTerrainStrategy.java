@@ -57,46 +57,67 @@ public abstract class BaseTerrainStrategy implements TerrainModificationStrategy
 
     /**
      * Sample surrounding terrain to build a palette of natural blocks.
-     * Scans a larger radius to understand local geology.
+     * Samples actual terrain blocks at the target elevation, handling underwater areas correctly.
      */
     protected TerrainPalette sampleSurroundingTerrain(Level level, BlockPos center, int sampleRadius) {
         TerrainPalette palette = new TerrainPalette();
 
-        // Sample in a square pattern around the center
+        // Find the actual terrain surface at center (not water surface)
+        BlockPos centerSurface = com.wcholmes.landscaper.common.util.TerrainUtils.findSurface(level, center);
+        if (centerSurface == null) {
+            centerSurface = center;
+        }
+
+        // Check if we're underwater - search down from surface for solid blocks
+        BlockState centerSurfaceState = level.getBlockState(centerSurface);
+        boolean isUnderwater = isUnderwater(level, centerSurface);
+
+        // If underwater, find the actual floor
+        BlockPos targetFloor = centerSurface;
+        if (isUnderwater || centerSurfaceState.is(Blocks.WATER)) {
+            // Search down for solid ground
+            for (int y = 0; y >= -20; y--) {
+                BlockPos checkPos = centerSurface.offset(0, y, 0);
+                BlockState checkState = level.getBlockState(checkPos);
+                if (!checkState.isAir() && !checkState.is(Blocks.WATER) && !checkState.is(Blocks.LAVA)) {
+                    targetFloor = checkPos;
+                    break;
+                }
+            }
+        }
+
+        int targetY = targetFloor.getY();
+        LOGGER.info("Sampling around Y={} (underwater={})", targetY, isUnderwater);
+
+        // Sample in a square pattern around the center at the TARGET DEPTH
         for (int xOffset = -sampleRadius; xOffset <= sampleRadius; xOffset++) {
             for (int zOffset = -sampleRadius; zOffset <= sampleRadius; zOffset++) {
-                BlockPos samplePos = center.offset(xOffset, 0, zOffset);
+                BlockPos sampleColumn = center.offset(xOffset, 0, zOffset);
 
-                // Find surface at this position
-                BlockPos surfacePos = com.wcholmes.landscaper.common.util.TerrainUtils.findSurface(level, samplePos);
-
-                if (surfacePos == null) continue;
-
-                // Sample blocks at different depths
-                for (int depth = 0; depth >= -10; depth--) {
-                    BlockPos sampleAt = surfacePos.offset(0, depth, 0);
+                // Sample blocks at depths relative to our target floor level
+                for (int depthOffset = 0; depthOffset >= -10; depthOffset--) {
+                    BlockPos sampleAt = new BlockPos(sampleColumn.getX(), targetY + depthOffset, sampleColumn.getZ());
                     BlockState state = level.getBlockState(sampleAt);
                     Block block = state.getBlock();
 
-                    // Skip air, water, and unsafe blocks
+                    // Skip air, water, lava
                     if (state.isAir() || block == Blocks.WATER || block == Blocks.LAVA) {
                         continue;
                     }
 
-                    // Skip vegetation and structure blocks
+                    // Only sample safe/natural blocks
                     if (!NaturalizationConfig.getSafeBlocks().contains(block)) {
                         continue;
                     }
 
-                    // Categorize by depth
-                    if (depth == 0) {
+                    // Categorize by depth relative to target floor
+                    if (depthOffset == 0) {
                         palette.addSurfaceBlock(block);
-                    } else if (depth >= -2) {
+                    } else if (depthOffset >= -2) {
                         palette.addSubsurfaceBlock(block);
-                    } else if (depth >= -7) {
+                    } else if (depthOffset >= -7) {
                         palette.addDeepBlock(block);
                     }
-                    // Ignore blocks deeper than -7 (bedrock layer)
                 }
             }
         }
