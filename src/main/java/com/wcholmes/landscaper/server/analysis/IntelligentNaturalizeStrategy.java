@@ -42,6 +42,12 @@ public class IntelligentNaturalizeStrategy {
         BlockPos surface = TerrainUtils.findSurface(level, center);
         if (surface == null) return 0;
 
+        // EMERGENCY SAFETY: Skip beach/river entirely until water issue resolved
+        if (profile.getWaterType() == TerrainProfile.WaterType.BEACH ||
+            profile.getWaterType() == TerrainProfile.WaterType.RIVER) {
+            return 0; // ABORT - beaches are broken, skip completely
+        }
+
         // Get positions to modify
         List<BlockPos> positions = circleShape ?
             getCirclePositions(surface, radius, messyEdge) :

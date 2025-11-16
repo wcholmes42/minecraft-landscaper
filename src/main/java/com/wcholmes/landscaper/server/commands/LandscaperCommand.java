@@ -147,6 +147,8 @@ public class LandscaperCommand {
             "§7Height: §e" + profile.getMinY() + "-" + profile.getMaxY() + " §7(avg: §e" + profile.getAverageY() + "§7)\n" +
             "§7Smoothness: §e" + String.format("%.1f%%", profile.getSmoothness() * 100) + "\n" +
             "§7Water: §e" + profile.getWaterType() + " §7(§e" + String.format("%.1f%%", profile.getWaterDensity() * 100) + "§7)\n" +
+            (profile.getWaterType() == TerrainProfile.WaterType.BEACH || profile.getWaterType() == TerrainProfile.WaterType.RIVER ?
+                "§c⚠ BEACH/RIVER detected - terrain modification DISABLED for safety\n" : "") +
             "§6Applying natural style to §e" + radius + "§6 block radius..."
         ), false);
 
