@@ -93,11 +93,14 @@ public class WaterFeatureManager {
                 }
             }
 
-            // Only place if adjacent to existing water AND below water level
+            // Only place if adjacent to existing water AND below water level AND contained
             if (adjacentToWater && pos.getY() <= profile.getWaterLevel()) {
-                level.setBlock(pos, Blocks.WATER.defaultBlockState(), 3);
-                existingWater.add(pos); // Add to set for next iteration
-                waterPlaced++;
+                // Final check: verify this water block is contained
+                if (isWaterBlockContained(level, pos)) {
+                    level.setBlock(pos, Blocks.WATER.defaultBlockState(), 3);
+                    existingWater.add(pos); // Add to set for next iteration
+                    waterPlaced++;
+                }
             }
         }
 
@@ -150,31 +153,46 @@ public class WaterFeatureManager {
             }
             if (tooClose) continue;
 
+            // Check if this location is a natural depression (containment check)
+            if (!isNaturalDepression(level, pondCenter, 5)) {
+                continue; // Skip - water would flow uncontained
+            }
+
             // Random pond size (2-5 block radius)
             int pondRadius = random.nextInt(2, 6);
 
             // Random depth (1-3 blocks)
             int depth = random.nextInt(1, 4);
 
-            // Create pond
+            // Collect pond positions first for validation
+            List<BlockPos> pondPositions = new ArrayList<>();
             for (BlockPos pos : positions) {
                 double distance = Math.sqrt(pos.distSqr(pondCenter));
-
                 if (distance <= pondRadius) {
-                    // Fill from surface down to depth
-                    BlockPos surfacePos = level.getBlockState(pos).isAir() ?
-                        pos.below() : pos;
+                    pondPositions.add(pos);
+                }
+            }
 
-                    for (int d = 0; d < depth; d++) {
-                        BlockPos waterPos = surfacePos.below(d);
-                        BlockState state = level.getBlockState(waterPos);
+            // Verify entire pond is contained before placing ANY water
+            if (!isPondContained(level, pondPositions, depth)) {
+                continue; // Water would spill - skip this pond
+            }
 
-                        // Replace air or soft blocks with water
-                        if (state.isAir() || state.getBlock() == Blocks.DIRT || state.getBlock() == Blocks.GRASS_BLOCK) {
-                            level.setBlock(waterPos, Blocks.WATER.defaultBlockState(), 3);
-                            existingWater.add(waterPos);
-                            waterPlaced++;
-                        }
+            // Safe to place - pond is contained
+            for (BlockPos pos : pondPositions) {
+                // Fill from surface down to depth
+                BlockPos surfacePos = level.getBlockState(pos).isAir() ?
+                    pos.below() : pos;
+
+                for (int d = 0; d < depth; d++) {
+                    BlockPos waterPos = surfacePos.below(d);
+                    BlockState state = level.getBlockState(waterPos);
+
+                    // Replace air or soft blocks with water
+                    if (state.isAir() || state.getBlock() == Blocks.DIRT || state.getBlock() == Blocks.GRASS_BLOCK) {
+                        level.setBlock(waterPos, Blocks.WATER.defaultBlockState(), 3);
+                        existingWater.add(waterPos);
+                        waterPlaced++;
                     }
                 }
             }
@@ -182,4 +200,103 @@ public class WaterFeatureManager {
 
         return waterPlaced;
     }
+
+    /**
+     * Check if a position is in a natural depression (lower than surroundings)
+     * This prevents placing water on flat/raised areas where it would flow away
+     */
+    private static boolean isNaturalDepression(Level level, BlockPos center, int checkRadius) {
+        int centerY = center.getY();
+        int higherNeighbors = 0;
+        int totalNeighbors = 0;
+
+        // Check surrounding blocks in a radius
+        for (int x = -checkRadius; x <= checkRadius; x++) {
+            for (int z = -checkRadius; z <= checkRadius; z++) {
+                if (x == 0 && z == 0) continue; // Skip center
+
+                BlockPos checkPos = center.offset(x, 0, z);
+                BlockState state = level.getBlockState(checkPos);
+
+                // Find solid block at this position
+                BlockPos solidPos = checkPos;
+                for (int y = -5; y <= 5; y++) {
+                    BlockState checkState = level.getBlockState(checkPos.offset(0, y, 0));
+                    if (!checkState.isAir() && checkState.getBlock() != Blocks.WATER) {
+                        solidPos = checkPos.offset(0, y, 0);
+                        break;
+                    }
+                }
+
+                totalNeighbors++;
+                if (solidPos.getY() >= centerY) {
+                    higherNeighbors++;
+                }
+            }
+        }
+
+        // Must be lower than at least 60% of surroundings to be a depression
+        return totalNeighbors > 0 && ((double) higherNeighbors / totalNeighbors) > 0.6;
+    }
+
+    /**
+     * Verify pond is fully contained - water won't flow out
+     */
+    private static boolean isPondContained(Level level, List<BlockPos> pondPositions, int depth) {
+        // For each water position, check if it has containment
+        for (BlockPos waterPos : pondPositions) {
+            // Check all horizontal neighbors
+            for (BlockPos neighbor : new BlockPos[]{
+                waterPos.north(), waterPos.south(),
+                waterPos.east(), waterPos.west()
+            }) {
+                // If neighbor is outside pond area, check if it's solid (contains the water)
+                if (!pondPositions.contains(neighbor)) {
+                    // Check if there's a solid block at this level or below
+                    boolean contained = false;
+                    for (int d = 0; d <= depth; d++) {
+                        BlockState state = level.getBlockState(neighbor.below(d));
+                        if (!state.isAir() && state.getBlock() != Blocks.WATER) {
+                            // Found solid block - this edge is contained
+                            contained = true;
+                            break;
+                        }
+                    }
+
+                    if (!contained) {
+                        // Water would flow out here - pond not contained
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return true; // All edges contained
+    }
+
+    /**
+     * Check if a single water block would be contained (won't flow infinitely)
+     */
+    private static boolean isWaterBlockContained(Level level, BlockPos waterPos) {
+        // Check all 4 horizontal directions
+        for (BlockPos neighbor : new BlockPos[]{
+            waterPos.north(), waterPos.south(),
+            waterPos.east(), waterPos.west()
+        }) {
+            BlockState neighborState = level.getBlockState(neighbor);
+
+            // If neighbor is air, water would flow there - check if that's contained
+            if (neighborState.isAir()) {
+                // Check below the air block - if there's no solid block, water flows down
+                BlockState below = level.getBlockState(neighbor.below());
+                if (below.isAir() || below.getBlock() == Blocks.WATER) {
+                    // Water would flow into air and potentially down - not contained
+                    return false;
+                }
+            }
+        }
+
+        return true; // Water is contained
+    }
 }
+
