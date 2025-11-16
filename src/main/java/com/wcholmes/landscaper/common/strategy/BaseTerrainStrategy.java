@@ -57,15 +57,23 @@ public abstract class BaseTerrainStrategy implements TerrainModificationStrategy
 
     /**
      * Determine the natural block to place at a given relative height.
+     * New strata depth system:
+     * - relativeY 0: 1 surface block (biome-specific)
+     * - relativeY -1 to -2: 2 subsurface blocks (biome-specific)
+     * - relativeY -3 to -7: 3-5 randomized deeper blocks (biome-specific transition to stone)
+     * - relativeY < -7: Stone bedrock
      */
     protected BlockState determineNaturalBlock(int relativeY, boolean isUnderwater, NaturalizationMode mode,
                                                net.minecraft.core.Holder<net.minecraft.world.level.biome.Biome> biome) {
-        if (isUnderwater) {
-            // Underwater terrain layers
-            if (relativeY > 0) {
-                return Blocks.AIR.defaultBlockState();
-            } else if (relativeY == 0) {
-                // Surface layer - messy mode adds variation
+        // Air above surface
+        if (relativeY > 0) {
+            return Blocks.AIR.defaultBlockState();
+        }
+
+        // Surface block (relativeY == 0) - biome-specific
+        if (relativeY == 0) {
+            if (isUnderwater) {
+                // Underwater surface - sand/gravel mix
                 if (mode.allowsVariation()) {
                     double roll = ThreadLocalRandom.current().nextDouble();
                     if (roll < UNDERWATER_SURF_SAND) return Blocks.SAND.defaultBlockState();
@@ -75,47 +83,27 @@ public abstract class BaseTerrainStrategy implements TerrainModificationStrategy
                 } else {
                     return Blocks.SAND.defaultBlockState();
                 }
-            } else if (relativeY == -1) {
-                // First subsurface - messy mode adds variation
-                if (mode.allowsVariation()) {
-                    double roll = ThreadLocalRandom.current().nextDouble();
-                    if (roll < UNDERWATER_MID_GRAVEL) return Blocks.GRAVEL.defaultBlockState();
-                    else if (roll < UNDERWATER_MID_SAND) return Blocks.SAND.defaultBlockState();
-                    else return Blocks.CLAY.defaultBlockState();
-                } else {
-                    return Blocks.GRAVEL.defaultBlockState();
-                }
-            } else if (relativeY >= TERRAIN_LAYER_SHALLOW) {
-                // Mid subsurface - messy mode adds variation
-                if (mode.allowsVariation()) {
-                    double roll = ThreadLocalRandom.current().nextDouble();
-                    if (roll < UNDERWATER_DEEP_SAND) return Blocks.SAND.defaultBlockState();
-                    else if (roll < UNDERWATER_DEEP_GRAVEL) return Blocks.GRAVEL.defaultBlockState();
-                    else return Blocks.CLAY.defaultBlockState();
-                } else {
-                    return Blocks.SAND.defaultBlockState();
-                }
-            } else if (relativeY >= TERRAIN_LAYER_MID) {
-                return Blocks.CLAY.defaultBlockState();
             } else {
-                return Blocks.STONE.defaultBlockState();
-            }
-        } else {
-            // Land terrain layers
-            if (relativeY > 0) {
-                return Blocks.AIR.defaultBlockState();
-            } else if (relativeY == 0) {
-                // Surface - use biome-specific palette
+                // Land surface - use biome-specific palette
                 Block surfaceBlock = BiomePalette.getSurfaceBlock(biome, mode, mode.allowsVariation());
                 return surfaceBlock.defaultBlockState();
-            } else if (relativeY >= TERRAIN_LAYER_SHALLOW) {
-                // 1-3 blocks below surface - DIRT
-                return Blocks.DIRT.defaultBlockState();
-            } else {
-                // Deep subsurface - STONE
-                return Blocks.STONE.defaultBlockState();
             }
         }
+
+        // Subsurface layer (relativeY -1 to -2) - biome-specific
+        if (relativeY >= -2) {
+            Block subsurfaceBlock = BiomePalette.getSubsurfaceBlock(biome, relativeY, isUnderwater, mode.allowsVariation());
+            return subsurfaceBlock.defaultBlockState();
+        }
+
+        // Deep layer (relativeY -3 to -7) - randomized biome-specific transition
+        if (relativeY >= -7) {
+            Block deepBlock = BiomePalette.getDeepLayerBlock(biome, relativeY, isUnderwater, mode.allowsVariation());
+            return deepBlock.defaultBlockState();
+        }
+
+        // Bedrock layer (relativeY < -7) - pure stone
+        return Blocks.STONE.defaultBlockState();
     }
 
     /**

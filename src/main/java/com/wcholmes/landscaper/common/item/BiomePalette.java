@@ -210,4 +210,158 @@ public class BiomePalette {
             return rareFlowers[ThreadLocalRandom.current().nextInt(rareFlowers.length)];
         }
     }
+
+    /**
+     * Get biome-specific subsurface blocks (1-2 blocks below surface).
+     * Different palettes for land vs underwater.
+     */
+    public static Block getSubsurfaceBlock(Holder<Biome> biome, int depth, boolean isUnderwater, boolean allowVariation) {
+        if (isUnderwater) {
+            return getUnderwaterSubsurfaceBlock(depth, allowVariation);
+        } else {
+            return getLandSubsurfaceBlock(biome, depth, allowVariation);
+        }
+    }
+
+    private static Block getLandSubsurfaceBlock(Holder<Biome> biome, int depth, boolean allowVariation) {
+        // Desert biomes - sandstone subsurface
+        if (biome.is(Biomes.DESERT) || biome.is(Biomes.BADLANDS) || biome.is(Biomes.ERODED_BADLANDS) || biome.is(Biomes.WOODED_BADLANDS)) {
+            if (!allowVariation) return Blocks.SANDSTONE;
+            double roll = ThreadLocalRandom.current().nextDouble();
+            // 80% sandstone, 15% sand, 5% red sandstone
+            if (roll < 0.80) return Blocks.SANDSTONE;
+            else if (roll < 0.95) return Blocks.SAND;
+            else return Blocks.RED_SANDSTONE;
+        }
+        // Taiga biomes - podzol/dirt mix
+        else if (biome.is(Biomes.TAIGA) || biome.is(Biomes.SNOWY_TAIGA) || biome.is(Biomes.OLD_GROWTH_PINE_TAIGA) || biome.is(Biomes.OLD_GROWTH_SPRUCE_TAIGA)) {
+            if (!allowVariation) return Blocks.DIRT;
+            double roll = ThreadLocalRandom.current().nextDouble();
+            // 70% dirt, 20% podzol, 10% coarse dirt
+            if (roll < 0.70) return Blocks.DIRT;
+            else if (roll < 0.90) return Blocks.PODZOL;
+            else return Blocks.COARSE_DIRT;
+        }
+        // Swamp biomes - mud/clay heavy
+        else if (biome.is(Biomes.SWAMP) || biome.is(Biomes.MANGROVE_SWAMP)) {
+            if (!allowVariation) return Blocks.MUD;
+            double roll = ThreadLocalRandom.current().nextDouble();
+            // 60% mud, 30% dirt, 10% clay
+            if (roll < 0.60) return Blocks.MUD;
+            else if (roll < 0.90) return Blocks.DIRT;
+            else return Blocks.CLAY;
+        }
+        // Savanna - coarse dirt mix
+        else if (biome.is(Biomes.SAVANNA) || biome.is(Biomes.SAVANNA_PLATEAU) || biome.is(Biomes.WINDSWEPT_SAVANNA)) {
+            if (!allowVariation) return Blocks.DIRT;
+            double roll = ThreadLocalRandom.current().nextDouble();
+            // 75% dirt, 20% coarse dirt, 5% red sand
+            if (roll < 0.75) return Blocks.DIRT;
+            else if (roll < 0.95) return Blocks.COARSE_DIRT;
+            else return Blocks.RED_SAND;
+        }
+        // Jungle - rich dirt/podzol
+        else if (biome.is(Biomes.JUNGLE) || biome.is(Biomes.SPARSE_JUNGLE) || biome.is(Biomes.BAMBOO_JUNGLE)) {
+            if (!allowVariation) return Blocks.DIRT;
+            double roll = ThreadLocalRandom.current().nextDouble();
+            // 80% dirt, 15% podzol, 5% mud
+            if (roll < 0.80) return Blocks.DIRT;
+            else if (roll < 0.95) return Blocks.PODZOL;
+            else return Blocks.MUD;
+        }
+        // Default (plains/forest/etc) - standard dirt
+        else {
+            if (!allowVariation) return Blocks.DIRT;
+            double roll = ThreadLocalRandom.current().nextDouble();
+            // 90% dirt, 8% coarse dirt, 2% gravel
+            if (roll < 0.90) return Blocks.DIRT;
+            else if (roll < 0.98) return Blocks.COARSE_DIRT;
+            else return Blocks.GRAVEL;
+        }
+    }
+
+    private static Block getUnderwaterSubsurfaceBlock(int depth, boolean allowVariation) {
+        if (!allowVariation) {
+            return depth == -1 ? Blocks.GRAVEL : Blocks.SAND;
+        }
+
+        double roll = ThreadLocalRandom.current().nextDouble();
+        if (depth == -1) {
+            // First subsurface - gravel heavy
+            if (roll < 0.70) return Blocks.GRAVEL;
+            else if (roll < 0.90) return Blocks.SAND;
+            else return Blocks.CLAY;
+        } else {
+            // Second subsurface - sand heavy
+            if (roll < 0.70) return Blocks.SAND;
+            else if (roll < 0.90) return Blocks.GRAVEL;
+            else return Blocks.CLAY;
+        }
+    }
+
+    /**
+     * Get biome-specific deep layer blocks (3-7 blocks below surface).
+     * Returns randomized blocks from a palette.
+     */
+    public static Block getDeepLayerBlock(Holder<Biome> biome, int depth, boolean isUnderwater, boolean allowVariation) {
+        if (isUnderwater) {
+            return getUnderwaterDeepLayerBlock(depth, allowVariation);
+        } else {
+            return getLandDeepLayerBlock(biome, depth, allowVariation);
+        }
+    }
+
+    private static Block getLandDeepLayerBlock(Holder<Biome> biome, int depth, boolean allowVariation) {
+        if (!allowVariation) return Blocks.STONE;
+
+        // Desert biomes - sandstone to stone transition
+        if (biome.is(Biomes.DESERT) || biome.is(Biomes.BADLANDS) || biome.is(Biomes.ERODED_BADLANDS) || biome.is(Biomes.WOODED_BADLANDS)) {
+            double roll = ThreadLocalRandom.current().nextDouble();
+            // Deeper = more stone, shallower = more sandstone
+            double stoneChance = 0.20 + (Math.abs(depth) - 3) * 0.15; // Increases with depth
+            if (roll < stoneChance) return Blocks.STONE;
+            else if (roll < stoneChance + 0.50) return Blocks.SANDSTONE;
+            else if (roll < stoneChance + 0.70) return Blocks.RED_SANDSTONE;
+            else return Blocks.SAND;
+        }
+        // Swamp - clay/mud to stone
+        else if (biome.is(Biomes.SWAMP) || biome.is(Biomes.MANGROVE_SWAMP)) {
+            double roll = ThreadLocalRandom.current().nextDouble();
+            double stoneChance = 0.15 + (Math.abs(depth) - 3) * 0.15;
+            if (roll < stoneChance) return Blocks.STONE;
+            else if (roll < stoneChance + 0.40) return Blocks.CLAY;
+            else if (roll < stoneChance + 0.70) return Blocks.MUD;
+            else return Blocks.DIRT;
+        }
+        // Taiga - dirt/stone mix
+        else if (biome.is(Biomes.TAIGA) || biome.is(Biomes.SNOWY_TAIGA) || biome.is(Biomes.OLD_GROWTH_PINE_TAIGA) || biome.is(Biomes.OLD_GROWTH_SPRUCE_TAIGA)) {
+            double roll = ThreadLocalRandom.current().nextDouble();
+            double stoneChance = 0.25 + (Math.abs(depth) - 3) * 0.15;
+            if (roll < stoneChance) return Blocks.STONE;
+            else if (roll < stoneChance + 0.50) return Blocks.DIRT;
+            else if (roll < stoneChance + 0.70) return Blocks.COARSE_DIRT;
+            else return Blocks.GRAVEL;
+        }
+        // Default - dirt to stone gradient
+        else {
+            double roll = ThreadLocalRandom.current().nextDouble();
+            double stoneChance = 0.20 + (Math.abs(depth) - 3) * 0.16; // Gradual transition
+            if (roll < stoneChance) return Blocks.STONE;
+            else if (roll < stoneChance + 0.60) return Blocks.DIRT;
+            else if (roll < stoneChance + 0.80) return Blocks.COARSE_DIRT;
+            else return Blocks.GRAVEL;
+        }
+    }
+
+    private static Block getUnderwaterDeepLayerBlock(int depth, boolean allowVariation) {
+        if (!allowVariation) return Blocks.CLAY;
+
+        double roll = ThreadLocalRandom.current().nextDouble();
+        double stoneChance = 0.10 + (Math.abs(depth) - 3) * 0.12; // Gradual stone increase
+
+        if (roll < stoneChance) return Blocks.STONE;
+        else if (roll < stoneChance + 0.40) return Blocks.CLAY;
+        else if (roll < stoneChance + 0.70) return Blocks.SAND;
+        else return Blocks.GRAVEL;
+    }
 }
