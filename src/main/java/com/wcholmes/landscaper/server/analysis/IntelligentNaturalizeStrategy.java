@@ -49,15 +49,22 @@ public class IntelligentNaturalizeStrategy {
 
         int blocksChanged = 0;
 
-        // Pass 1: Clear vegetation and air
+        // Pass 1: Clear vegetation (but preserve snow!)
         for (BlockPos pos : positions) {
             BlockPos surfacePos = TerrainUtils.findSurface(level, pos);
             if (surfacePos == null) continue;
 
-            // Clear vegetation above
+            // Clear vegetation above (EXCEPT snow)
             for (int y = 1; y <= 3; y++) {
                 BlockPos vegPos = surfacePos.above(y);
                 BlockState state = level.getBlockState(vegPos);
+                Block block = state.getBlock();
+
+                // Don't remove snow layers!
+                if (block == Blocks.SNOW || block == Blocks.POWDER_SNOW) {
+                    continue;
+                }
+
                 if (!state.isAir() && isVegetation(state)) {
                     level.setBlock(vegPos, Blocks.AIR.defaultBlockState(), 3);
                 }
@@ -121,11 +128,16 @@ public class IntelligentNaturalizeStrategy {
             }
         }
 
-        // Pass 3: Add vegetation based on profile
+        // Pass 3: Add vegetation based on profile (skip if at/above snow elevation)
         if (profile.getVegetationDensity() > 0) {
             for (BlockPos pos : positions) {
                 BlockPos surfacePos = TerrainUtils.findSurface(level, pos);
                 if (surfacePos == null) continue;
+
+                // Don't place vegetation above snow line
+                if (profile.hasSnow() && surfacePos.getY() >= profile.getSnowElevationThreshold()) {
+                    continue;
+                }
 
                 // Apply vegetation with sampled density
                 if (ThreadLocalRandom.current().nextDouble() < profile.getVegetationDensity()) {
@@ -136,6 +148,26 @@ public class IntelligentNaturalizeStrategy {
                             level.setBlock(surfacePos.above(), vegBlock.defaultBlockState(), 3);
                             blocksChanged++;
                         }
+                    }
+                }
+            }
+        }
+
+        // Pass 3.5: Apply snow layers at appropriate elevations
+        if (profile.hasSnow()) {
+            for (BlockPos pos : positions) {
+                BlockPos surfacePos = TerrainUtils.findSurface(level, pos);
+                if (surfacePos == null) continue;
+
+                // Apply snow if at or above snow threshold
+                if (surfacePos.getY() >= profile.getSnowElevationThreshold()) {
+                    BlockPos snowPos = surfacePos.above();
+                    BlockState aboveState = level.getBlockState(snowPos);
+
+                    // Only place on solid blocks, don't replace existing snow
+                    if (aboveState.isAir()) {
+                        level.setBlock(snowPos, Blocks.SNOW.defaultBlockState(), 3);
+                        blocksChanged++;
                     }
                 }
             }

@@ -26,6 +26,8 @@ public class TerrainProfile {
     private final WaterType waterType;
     private final double waterDensity;
     private final int waterLevel;
+    private final boolean hasSnow;
+    private final int snowElevationThreshold;
 
     public enum WaterType {
         NONE, BEACH, RIVER, LAKE, SWAMP
@@ -41,7 +43,9 @@ public class TerrainProfile {
                          double slopeVariation,
                          WaterType waterType,
                          double waterDensity,
-                         int waterLevel) {
+                         int waterLevel,
+                         boolean hasSnow,
+                         int snowElevationThreshold) {
         this.surfaceBlockPalette = surfaceBlockPalette;
         this.subsurfaceBlockPalette = subsurfaceBlockPalette;
         this.vegetationPalette = vegetationPalette;
@@ -56,6 +60,8 @@ public class TerrainProfile {
         this.waterType = waterType;
         this.waterDensity = waterDensity;
         this.waterLevel = waterLevel;
+        this.hasSnow = hasSnow;
+        this.snowElevationThreshold = snowElevationThreshold;
 
         // Calculate normalized surface block frequencies
         this.surfaceBlockFrequency = new HashMap<>();
@@ -85,6 +91,8 @@ public class TerrainProfile {
     public WaterType getWaterType() { return waterType; }
     public double getWaterDensity() { return waterDensity; }
     public int getWaterLevel() { return waterLevel; }
+    public boolean hasSnow() { return hasSnow; }
+    public int getSnowElevationThreshold() { return snowElevationThreshold; }
 
     public Block getDominantSurfaceBlock() {
         return surfaceBlockPalette.entrySet().stream()

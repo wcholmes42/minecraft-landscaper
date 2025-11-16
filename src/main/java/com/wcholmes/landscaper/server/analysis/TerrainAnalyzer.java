@@ -34,6 +34,10 @@ public class TerrainAnalyzer {
         int flowingWaterCount = 0;
         int swampMudCount = 0;
 
+        // Snow tracking
+        List<Integer> snowElevations = new ArrayList<>();
+        boolean hasSnowLayers = false;
+
         // Sample the chunk area
         for (int x = -CHUNK_RADIUS; x <= CHUNK_RADIUS; x += SAMPLE_DENSITY) {
             for (int z = -CHUNK_RADIUS; z <= CHUNK_RADIUS; z += SAMPLE_DENSITY) {
@@ -75,11 +79,19 @@ public class TerrainAnalyzer {
                     }
                 }
 
-                // Analyze vegetation
+                // Analyze vegetation and snow
                 for (int y = 1; y <= 3; y++) {
                     BlockState state = level.getBlockState(surface.above(y));
+                    Block block = state.getBlock();
+
+                    // Check for snow layers
+                    if (block == Blocks.SNOW || block == Blocks.POWDER_SNOW) {
+                        hasSnowLayers = true;
+                        snowElevations.add(surfaceY);
+                    }
+
                     if (isVegetation(state)) {
-                        vegetationCounts.merge(state.getBlock(), 1, Integer::sum);
+                        vegetationCounts.merge(block, 1, Integer::sum);
                     }
                 }
 
@@ -108,10 +120,16 @@ public class TerrainAnalyzer {
 
         double waterDensity = totalBlocks > 0 ? (double) waterBlockCount / totalBlocks : 0.0;
 
+        // Calculate snow elevation threshold (minimum Y where snow was found)
+        int snowThreshold = snowElevations.isEmpty() ?
+            9999 : // No snow found - set very high
+            snowElevations.stream().min(Integer::compare).orElse(9999);
+
         return new TerrainProfile(
             surfaceBlockCounts, subsurfaceBlockCounts, vegetationCounts, vegetationDensity,
             minY, maxY, averageY, medianY, heightDistribution,
-            smoothness, avgSlope, waterType, waterDensity, averageY
+            smoothness, avgSlope, waterType, waterDensity, averageY,
+            hasSnowLayers, snowThreshold
         );
     }
 
