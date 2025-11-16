@@ -206,6 +206,24 @@ public class NaturalizationStaff extends Item {
             return InteractionResult.FAIL;
         }
 
+        // Check for shift-click to undo last operation
+        if (player != null && player.isShiftKeyDown()) {
+            int blocksRestored = com.wcholmes.landscaper.common.undo.UndoManager.undoLastOperation(player, level);
+            if (blocksRestored > 0) {
+                player.displayClientMessage(
+                    Component.literal(String.format("Undo: Restored %d blocks", blocksRestored)),
+                    true
+                );
+                return InteractionResult.SUCCESS;
+            } else {
+                player.displayClientMessage(
+                    Component.literal("Nothing to undo!"),
+                    true
+                );
+                return InteractionResult.FAIL;
+            }
+        }
+
         // Allow clicking on any face (top, sides, bottom)
         // Future: can add mode-specific behavior for cliff faces here
 
