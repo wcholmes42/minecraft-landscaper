@@ -60,7 +60,8 @@ public class TerrainAnalyzer {
                 BlockState surfaceState = level.getBlockState(surface);
                 Block surfaceBlock = surfaceState.getBlock();
 
-                if (!surfaceState.isAir()) {
+                // NEVER sample water as surface block!
+                if (!surfaceState.isAir() && surfaceBlock != Blocks.WATER) {
                     // Check if this is a NATURAL surface block or exposed subsurface
                     if (isNaturalSurfaceBlock(surfaceBlock)) {
                         // Natural surface - count with distance weight

@@ -4,6 +4,7 @@ import com.wcholmes.landscaper.common.util.TerrainUtils;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.HashMap;
@@ -65,10 +66,19 @@ public class BilateralBlockFilter {
         }
 
         // Return block with highest combined weight (most similar to neighbors)
-        return blockWeights.entrySet().stream()
+        // NEVER return water or air!
+        Block selected = blockWeights.entrySet().stream()
+            .filter(e -> e.getKey() != Blocks.WATER && e.getKey() != Blocks.AIR)
             .max(Map.Entry.comparingByValue())
             .map(Map.Entry::getKey)
             .orElse(proposedBlock);
+
+        // Safety check
+        if (selected == Blocks.WATER || selected == Blocks.AIR) {
+            return proposedBlock; // Fallback to proposed
+        }
+
+        return selected;
     }
 
     /**
