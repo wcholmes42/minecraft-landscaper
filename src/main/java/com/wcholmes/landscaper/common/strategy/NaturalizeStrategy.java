@@ -120,6 +120,14 @@ public class NaturalizeStrategy extends BaseTerrainStrategy {
         // Clean up item drops
         cleanupItemDrops(level, center, radius);
 
+        // Record operation for undo
+        if (!undoChanges.isEmpty() && player != null) {
+            com.wcholmes.landscaper.common.undo.UndoManager.recordOperation(player, undoChanges);
+            LOGGER.info("Recorded {} block changes for undo (undo depth: {})",
+                undoChanges.size(),
+                com.wcholmes.landscaper.common.undo.UndoManager.getUndoDepth(player));
+        }
+
         // Smart logging
         String typeMessage;
         if (underwaterColumns > 0 && landColumns > 0) {
