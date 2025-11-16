@@ -1,0 +1,205 @@
+package com.wcholmes.landscaper.server.analysis;
+
+import com.wcholmes.landscaper.common.config.PlayerConfig;
+import com.wcholmes.landscaper.common.item.NaturalizationMode;
+import com.wcholmes.landscaper.common.util.TerrainUtils;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
+
+/**
+ * Intelligent terrain naturalization using analyzed terrain profile.
+ * Replicates the natural style of surrounding terrain.
+ */
+public class IntelligentNaturalizeStrategy {
+
+    /**
+     * Apply intelligent naturalization based on analyzed terrain profile.
+     *
+     * @param level The world level
+     * @param center Center position for modification
+     * @param radius Radius of modification
+     * @param profile Analyzed terrain profile from surrounding area
+     * @param circleShape Whether to use circle shape
+     * @param messyEdge Messy edge extension
+     * @return Number of blocks modified
+     */
+    public static int apply(Level level, BlockPos center, int radius, TerrainProfile profile,
+                           boolean circleShape, int messyEdge) {
+
+        // Find actual surface
+        BlockPos surface = TerrainUtils.findSurface(level, center);
+        if (surface == null) return 0;
+
+        // Get positions to modify
+        List<BlockPos> positions = circleShape ?
+            getCirclePositions(surface, radius, messyEdge) :
+            getSquarePositions(surface, radius, messyEdge);
+
+        int blocksChanged = 0;
+
+        // Pass 1: Clear vegetation and air
+        for (BlockPos pos : positions) {
+            BlockPos surfacePos = TerrainUtils.findSurface(level, pos);
+            if (surfacePos == null) continue;
+
+            // Clear vegetation above
+            for (int y = 1; y <= 3; y++) {
+                BlockPos vegPos = surfacePos.above(y);
+                BlockState state = level.getBlockState(vegPos);
+                if (!state.isAir() && isVegetation(state)) {
+                    level.setBlock(vegPos, Blocks.AIR.defaultBlockState(), 3);
+                }
+            }
+        }
+
+        // Pass 2: Apply terrain blocks using profile data
+        for (BlockPos pos : positions) {
+            BlockPos surfacePos = TerrainUtils.findSurface(level, pos);
+            if (surfacePos == null) continue;
+
+            int currentY = surfacePos.getY();
+
+            // Calculate target height based on profile's height distribution and smoothness
+            int targetY = calculateTargetHeight(pos, surface, profile);
+            int heightDiff = targetY - currentY;
+
+            // Apply height changes with profile-based blocks
+            if (heightDiff > 0) {
+                // Build up
+                for (int y = 0; y < heightDiff; y++) {
+                    Block block = profile.getWeightedRandomBlock();
+                    level.setBlock(surfacePos.above(y + 1), block.defaultBlockState(), 3);
+                    blocksChanged++;
+                }
+            } else if (heightDiff < 0) {
+                // Dig down
+                for (int y = 0; y < Math.abs(heightDiff); y++) {
+                    level.setBlock(surfacePos.above(y), Blocks.AIR.defaultBlockState(), 3);
+                    blocksChanged++;
+                }
+            }
+
+            // Place subsurface layers with sampled blocks
+            BlockPos newSurface = surfacePos.above(Math.max(0, heightDiff));
+            for (int y = 1; y <= 5; y++) {
+                Block block = profile.getWeightedRandomBlock();
+                level.setBlock(newSurface.below(y), block.defaultBlockState(), 3);
+                blocksChanged++;
+            }
+        }
+
+        // Pass 3: Add vegetation based on profile
+        if (profile.getVegetationDensity() > 0) {
+            for (BlockPos pos : positions) {
+                BlockPos surfacePos = TerrainUtils.findSurface(level, pos);
+                if (surfacePos == null) continue;
+
+                // Apply vegetation with sampled density
+                if (ThreadLocalRandom.current().nextDouble() < profile.getVegetationDensity()) {
+                    Block vegBlock = profile.getWeightedRandomVegetation();
+                    if (vegBlock != null) {
+                        BlockState surfaceState = level.getBlockState(surfacePos);
+                        if (canSupportVegetation(surfaceState)) {
+                            level.setBlock(surfacePos.above(), vegBlock.defaultBlockState(), 3);
+                            blocksChanged++;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Pass 4: Clean up item drops
+        AABB bounds = new AABB(surface).inflate(radius + messyEdge);
+        level.getEntitiesOfClass(ItemEntity.class, bounds).forEach(ItemEntity::discard);
+
+        return blocksChanged;
+    }
+
+    /**
+     * Calculate target height for a position based on profile characteristics
+     */
+    private static int calculateTargetHeight(BlockPos pos, BlockPos center, TerrainProfile profile) {
+        // Distance from center (for natural variation)
+        double distance = Math.sqrt(pos.distSqr(center));
+
+        // Use profile's average height as base
+        int baseHeight = profile.getAverageY();
+
+        // Add variation based on profile's smoothness
+        // Smoother terrain = less variation, rougher = more variation
+        double variationAmount = (1.0 - profile.getSmoothness()) * profile.getHeightRange() * 0.3;
+
+        // Simple noise-like variation (could use Perlin noise for better results)
+        double variation = (Math.sin(pos.getX() * 0.1) + Math.cos(pos.getZ() * 0.1)) * variationAmount;
+
+        return (int) (baseHeight + variation);
+    }
+
+    /**
+     * Get circle-shaped positions
+     */
+    private static List<BlockPos> getCirclePositions(BlockPos center, int radius, int messyEdge) {
+        List<BlockPos> positions = new ArrayList<>();
+        int totalRadius = radius + messyEdge;
+
+        for (int x = -totalRadius; x <= totalRadius; x++) {
+            for (int z = -totalRadius; z <= totalRadius; z++) {
+                double distance = Math.sqrt(x * x + z * z);
+                if (distance <= totalRadius) {
+                    positions.add(center.offset(x, 0, z));
+                }
+            }
+        }
+
+        return positions;
+    }
+
+    /**
+     * Get square-shaped positions
+     */
+    private static List<BlockPos> getSquarePositions(BlockPos center, int radius, int messyEdge) {
+        List<BlockPos> positions = new ArrayList<>();
+        int totalRadius = radius + messyEdge;
+
+        for (int x = -totalRadius; x <= totalRadius; x++) {
+            for (int z = -totalRadius; z <= totalRadius; z++) {
+                positions.add(center.offset(x, 0, z));
+            }
+        }
+
+        return positions;
+    }
+
+    private static boolean isVegetation(BlockState state) {
+        if (state.isAir()) return false;
+        Block block = state.getBlock();
+
+        return block == Blocks.GRASS || block == Blocks.TALL_GRASS ||
+               block == Blocks.FERN || block == Blocks.LARGE_FERN ||
+               block == Blocks.SEAGRASS || block == Blocks.KELP ||
+               block.getName().getString().contains("flower") ||
+               block.getName().getString().contains("sapling");
+    }
+
+    private static boolean canSupportVegetation(BlockState state) {
+        Block block = state.getBlock();
+        return block == Blocks.GRASS_BLOCK ||
+               block == Blocks.DIRT ||
+               block == Blocks.PODZOL ||
+               block == Blocks.MYCELIUM ||
+               block == Blocks.SAND ||
+               block == Blocks.MUD;
+    }
+}

@@ -8,6 +8,9 @@ import com.wcholmes.landscaper.common.item.NaturalizationMode;
 import com.wcholmes.landscaper.common.strategy.*;
 import com.wcholmes.landscaper.common.util.TerrainUtils;
 import com.wcholmes.landscaper.server.PlayerSettings;
+import com.wcholmes.landscaper.server.analysis.TerrainAnalyzer;
+import com.wcholmes.landscaper.server.analysis.TerrainProfile;
+import com.wcholmes.landscaper.server.analysis.IntelligentNaturalizeStrategy;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -19,7 +22,14 @@ public class LandscaperCommand {
 
     public static void register(CommandDispatcher<CommandSourceStack> dispatcher) {
         dispatcher.register(Commands.literal("landscaper")
+            // SMART NATURALIZE - Analyzes surrounding terrain and replicates style
             .then(Commands.literal("naturalize")
+                .then(Commands.argument("radius", IntegerArgumentType.integer(1, 50))
+                    .executes(LandscaperCommand::smartNaturalize)
+                )
+            )
+            // MANUAL MODE - Traditional mode-based naturalization
+            .then(Commands.literal("apply")
                 .executes(ctx -> naturalize(ctx, null, null))
                 .then(Commands.argument("mode", com.mojang.brigadier.arguments.StringArgumentType.string())
                     .suggests((ctx, builder) -> {
@@ -96,6 +106,60 @@ public class LandscaperCommand {
         applyNaturalization(level, player, surfacePos, mode, radius);
 
         source.sendSuccess(() -> Component.literal("§6Naturalized §e" + radius + "§6 block radius with mode §e" + mode.getDisplayName()), false);
+
+        return 1;
+    }
+
+    /**
+     * SMART NATURALIZE - Analyzes surrounding terrain and replicates natural style
+     */
+    private static int smartNaturalize(CommandContext<CommandSourceStack> ctx) {
+        CommandSourceStack source = ctx.getSource();
+
+        if (!(source.getEntity() instanceof ServerPlayer player)) {
+            source.sendFailure(Component.literal("Only players can use this command"));
+            return 0;
+        }
+
+        ServerLevel level = (ServerLevel) player.level();
+        int radius = IntegerArgumentType.getInteger(ctx, "radius");
+
+        BlockPos pos = player.blockPosition();
+        BlockPos surfacePos = TerrainUtils.findSurface(level, pos);
+
+        if (surfacePos == null) {
+            source.sendFailure(Component.literal("Could not find valid surface"));
+            return 0;
+        }
+
+        // ANALYZE surrounding terrain (1 chunk radius = 16 blocks)
+        source.sendSuccess(() -> Component.literal("§6Analyzing surrounding terrain..."), false);
+        TerrainProfile profile = TerrainAnalyzer.analyze(level, surfacePos);
+
+        // Show analysis results
+        source.sendSuccess(() -> Component.literal(
+            "§6Analysis complete!\n" +
+            "§7Blocks: §e" + profile.getBlockPalette().size() + " types\n" +
+            "§7Vegetation: §e" + profile.getVegetationPalette().size() + " types (§e" + String.format("%.1f%%", profile.getVegetationDensity() * 100) + " density)\n" +
+            "§7Height: §e" + profile.getMinY() + "-" + profile.getMaxY() + " §7(avg: §e" + profile.getAverageY() + "§7)\n" +
+            "§7Smoothness: §e" + String.format("%.1f%%", profile.getSmoothness() * 100) + "\n" +
+            "§7Water: §e" + profile.getWaterType() + " §7(§e" + String.format("%.1f%%", profile.getWaterDensity() * 100) + "§7)\n" +
+            "§6Applying natural style to §e" + radius + "§6 block radius..."
+        ), false);
+
+        // APPLY using intelligent strategy
+        int blocksChanged = IntelligentNaturalizeStrategy.apply(
+            level,
+            surfacePos,
+            radius,
+            profile,
+            NaturalizationConfig.isCircleShape(),
+            NaturalizationConfig.getMessyEdgeExtension()
+        );
+
+        source.sendSuccess(() -> Component.literal(
+            "§a✓ Complete! §6Modified §e" + blocksChanged + " §6blocks using sampled terrain style"
+        ), false);
 
         return 1;
     }
