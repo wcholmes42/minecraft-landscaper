@@ -143,13 +143,21 @@ public class TerrainProfile {
      * - Diverse areas: Use weighted random
      */
     public Block getConsistencyAwareSurfaceBlock() {
+        Block selected;
         if (isHomogeneous()) {
             // Mono-block area - use dominant block EXCLUSIVELY (no variation)
-            return getDominantSurfaceBlock();
+            selected = getDominantSurfaceBlock();
         } else {
             // Diverse area - use weighted random
-            return getWeightedRandomSurfaceBlock();
+            selected = getWeightedRandomSurfaceBlock();
         }
+
+        // NEVER EVER return water, air, or lava!
+        if (selected == Blocks.WATER || selected == Blocks.AIR || selected == Blocks.LAVA) {
+            return Blocks.GRASS_BLOCK; // Safe default
+        }
+
+        return selected;
     }
 
     /**
@@ -195,29 +203,46 @@ public class TerrainProfile {
                 return Blocks.SANDSTONE;
             }
 
-            // Default: use dominant block or dirt
+            // Default: use dominant block (but never water!)
+            if (dominant == Blocks.WATER || dominant == Blocks.AIR || dominant == Blocks.LAVA) {
+                return Blocks.STONE; // Safe fallback
+            }
             return dominant;
         } else {
-            // Diverse area - use weighted random
+            // Diverse area - use weighted random (already filters water)
             return getWeightedRandomSubsurfaceBlock();
         }
     }
 
     private Block getWeightedRandom(Map<Block, Integer> palette, Block defaultBlock) {
-        int totalWeight = palette.values().stream().mapToInt(Integer::intValue).sum();
+        // NEVER return water or air - filter them out
+        Map<Block, Integer> filteredPalette = new HashMap<>();
+        for (Map.Entry<Block, Integer> entry : palette.entrySet()) {
+            Block block = entry.getKey();
+            if (block != Blocks.WATER && block != Blocks.AIR && block != Blocks.LAVA) {
+                filteredPalette.put(block, entry.getValue());
+            }
+        }
+
+        int totalWeight = filteredPalette.values().stream().mapToInt(Integer::intValue).sum();
         if (totalWeight == 0) return defaultBlock;
 
         int random = ThreadLocalRandom.current().nextInt(totalWeight);
         int cumulative = 0;
 
-        for (Map.Entry<Block, Integer> entry : palette.entrySet()) {
+        for (Map.Entry<Block, Integer> entry : filteredPalette.entrySet()) {
             cumulative += entry.getValue();
             if (random < cumulative) {
-                return entry.getKey();
+                Block selected = entry.getKey();
+                // Final safety check
+                if (selected == Blocks.WATER || selected == Blocks.AIR || selected == Blocks.LAVA) {
+                    return defaultBlock;
+                }
+                return selected;
             }
         }
 
-        return palette.keySet().iterator().next();
+        return defaultBlock;
     }
 
     public Block getWeightedRandomVegetation() {
