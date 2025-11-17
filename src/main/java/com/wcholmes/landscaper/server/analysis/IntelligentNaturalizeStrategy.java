@@ -204,9 +204,29 @@ public class IntelligentNaturalizeStrategy {
         LOGGER.info("Pass 4 complete (overhang repair) - filled: {}", overhangsFilled);
 
         // WATER SYSTEM REMOVED - was causing edge issues
-        // No Pass 5 - water completely eliminated
+        // No water placement
 
-        // Pass 5: Clean up item drops
+        // Pass 5: AGGRESSIVE water removal (final cleanup)
+        int waterRemoved = 0;
+        for (BlockPos pos : positions) {
+            // Check surface and above for any water
+            for (int y = -2; y <= 5; y++) {
+                BlockPos checkPos = pos.offset(0, y, 0);
+                BlockState state = level.getBlockState(checkPos);
+
+                if (state.getBlock() == Blocks.WATER) {
+                    // DESTROY all water in modified area
+                    level.setBlock(checkPos, Blocks.AIR.defaultBlockState(), 3);
+                    waterRemoved++;
+                }
+            }
+        }
+        LOGGER.info("Pass 5 complete (water removal) - removed: {}", waterRemoved);
+        if (waterRemoved > 0) {
+            LOGGER.warn("⚠️  Removed {} water blocks in final cleanup!", waterRemoved);
+        }
+
+        // Pass 6: Clean up item drops
         AABB bounds = new AABB(surface).inflate(radius + messyEdge);
         level.getEntitiesOfClass(ItemEntity.class, bounds).forEach(ItemEntity::discard);
 
