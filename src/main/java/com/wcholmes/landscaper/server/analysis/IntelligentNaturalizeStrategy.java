@@ -203,15 +203,10 @@ public class IntelligentNaturalizeStrategy {
         blocksChanged += overhangsFilled;
         LOGGER.info("Pass 4 complete (overhang repair) - filled: {}", overhangsFilled);
 
-        // Pass 5: Apply water features (respects water type rules)
-        int waterBlocks = WaterFeatureManager.applyWaterFeatures(level, positions, profile);
-        blocksChanged += waterBlocks;
-        LOGGER.info("Pass 5 complete (water) - placed: {} (should be 0!)", waterBlocks);
-        if (waterBlocks > 0) {
-            LOGGER.error("❌ WATER WAS PLACED! This should NEVER happen! Count: {}", waterBlocks);
-        }
+        // WATER SYSTEM REMOVED - was causing edge issues
+        // No Pass 5 - water completely eliminated
 
-        // Pass 6: Clean up item drops
+        // Pass 5: Clean up item drops
         AABB bounds = new AABB(surface).inflate(radius + messyEdge);
         level.getEntitiesOfClass(ItemEntity.class, bounds).forEach(ItemEntity::discard);
 
